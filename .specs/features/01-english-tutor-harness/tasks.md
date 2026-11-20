@@ -243,8 +243,8 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] `plugin.json` and `mcp_config.json` validate as well-formed JSON matching Antigravity plugin schema
-- [ ] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
+- [x] `plugin.json` and `mcp_config.json` validate as well-formed JSON matching Antigravity plugin schema
+- [x] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
 
 **Tests**: none
 **Gate**: build

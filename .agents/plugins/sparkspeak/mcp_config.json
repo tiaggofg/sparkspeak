@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sparkspeak": {
+      "command": "uv",
+      "args": ["run", "--directory", ".", "sparkspeak-mcp"]
+    }
+  }
+}
