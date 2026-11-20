@@ -144,9 +144,9 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] DDL defines `schema_migrations`, `decks`, `cards`, `study_sessions`, `review_logs`, `session_turns`, `error_logs` and all 5 indexes
-- [ ] Seed SQL inserts 3 decks (`conversational`, `phrasal-verbs`, `tech-meetings`) and starter cards idempotently
-- [ ] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
+- [x] DDL defines `schema_migrations`, `decks`, `cards`, `study_sessions`, `review_logs`, `session_turns`, `error_logs` and all 5 indexes
+- [x] Seed SQL inserts 3 decks (`conversational`, `phrasal-verbs`, `tech-meetings`) and starter cards idempotently
+- [x] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
 
 **Tests**: none
 **Gate**: build
