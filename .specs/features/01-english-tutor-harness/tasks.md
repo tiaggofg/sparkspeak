@@ -104,10 +104,10 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Path resolution defaults to `.data/sparkspeak.db` and honors `SPARKSPEAK_DB_PATH`
-- [ ] Structured error envelope serializes `error_code`, `message`, `recoverable`, `fallback_hint`, `details`
-- [ ] Unit tests in `tests/unit/test_config_and_errors.py` pass (4+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit -v`
+- [x] Path resolution defaults to `.data/sparkspeak.db` and honors `SPARKSPEAK_DB_PATH`
+- [x] Structured error envelope serializes `error_code`, `message`, `recoverable`, `fallback_hint`, `details`
+- [x] Unit tests in `tests/unit/test_config_and_errors.py` pass (4+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit -v`
 
 **Tests**: unit
 **Gate**: quick
