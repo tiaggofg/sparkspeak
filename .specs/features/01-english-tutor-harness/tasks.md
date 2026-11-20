@@ -468,46 +468,46 @@ T16 → T17 → T18 → T19 → T20
 ## Checks
 
 **C1** - `start_session` persists an active `study_sessions` row in SQLite (SRS-01, AC 1)
-Proof: run integration | PASSED tests/integration/test_mcp_stdio_protocol.py::test_start_session_persists_active_row
+Proof: run integration | tests/integration/test_mcp_stdio_protocol.py::test_start_session_persists_active_row PASSED
 
 **C2** - `get_due_cards` orders overdue/due cards by `due_at ASC` before `new` cards up to `new_cards_limit` (SRS-02, AC 2)
-Proof: run integration | PASSED tests/integration/test_sqlite_repositories.py::test_get_due_cards_orders_due_before_new
+Proof: run integration | tests/integration/test_sqlite_repositories.py::test_get_due_cards_orders_due_before_new PASSED
 
 **C3** - `submit_review` updates FSRS state transactionally and inserts an immutable `review_logs` row (SRS-03, AC 3)
-Proof: run integration | PASSED tests/integration/test_sqlite_repositories.py::test_submit_review_updates_fsrs_and_logs
+Proof: run integration | tests/integration/test_sqlite_repositories.py::test_submit_review_updates_fsrs_and_logs PASSED
 
 **C4** - `submit_review` rejects invalid rating outside `{1..4}` with `INVALID_RATING` and leaves DB unchanged (SRS-04, AC 4)
-Proof: run unit | PASSED tests/unit/test_srs_engine.py::test_invalid_rating_raises_without_mutation
+Proof: run unit | tests/unit/test_srs_engine.py::test_invalid_rating_raises_without_mutation[0] PASSED
 
 **C5** - Text mode session runs `active_review` and `roleplay` without calling audio hardware tools (SKILL-01, AC 5)
-Proof: run integration | PASSED tests/integration/test_mcp_stdio_protocol.py::test_text_mode_never_invokes_audio
+Proof: run integration | tests/integration/test_mcp_stdio_protocol.py::test_text_mode_never_invokes_audio PASSED
 
 **C6** - SQLite migrations run idempotently on startup with `foreign_keys=ON` and `journal_mode=WAL` (DB-01, AC 6)
-Proof: run integration | PASSED tests/integration/test_sqlite_migrations.py::test_migrations_idempotent_wal_fk
+Proof: run integration | tests/integration/test_sqlite_migrations.py::test_migrations_idempotent_wal_fk PASSED
 
 **C7** - `speak_text` synthesizes English audio via `piper-tts` and sends PCM to PipeWire sink (AUDIO-01, AC 1)
-Proof: run unit | PASSED tests/unit/test_piper_tts.py::test_speak_text_plays_pcm_to_device
+Proof: run unit | tests/unit/test_piper_tts.py::test_speak_text_plays_pcm_to_device PASSED
 
 **C8** - `speak_text` rejects out-of-range speed or empty text with `INVALID_ARGUMENT` and returns `TTS_MODEL_MISSING` when `.onnx` is absent (AUDIO-02, AC 2-3)
-Proof: run integration | PASSED tests/integration/test_mcp_tts_tool.py::test_speak_text_validation_and_missing_model
+Proof: run integration | tests/integration/test_mcp_tts_tool.py::test_speak_text_validation_and_missing_model PASSED
 
 **C9** - `listen_and_transcribe` captures 16kHz PCM with Silero VAD endpointing and preserves verbatim learner grammar mistakes (AUDIO-03, AC 1-2)
-Proof: run integration | PASSED tests/integration/test_whisper_wav_fixture.py::test_verbatim_error_preservation
+Proof: run integration | tests/integration/test_whisper_wav_fixture.py::test_verbatim_error_preservation PASSED
 
 **C10** - `listen_and_transcribe` returns `speech_detected: false` on silence timeout, `truncated_at_max_duration: true` at cap, and `MICROPHONE_UNAVAILABLE` when input device fails (AUDIO-04, AC 3-4, 6)
-Proof: run integration | PASSED tests/integration/test_mcp_stt_tool.py::test_stt_timeouts_and_missing_mic
+Proof: run integration | tests/integration/test_mcp_stt_tool.py::test_stt_timeouts_and_missing_mic PASSED
 
 **C11** - Switching mid-session from voice to text preserves active session state and card progress (AUDIO-05, AC 5)
-Proof: run unit | PASSED tests/unit/test_review_and_session_service.py::test_voice_to_text_switch_preserves_session
+Proof: run unit | tests/unit/test_review_and_session_service.py::test_voice_to_text_switch_preserves_session PASSED
 
 **C12** - `log_turn_and_errors` persists turns and increments `occurrence_count` on repeated errors (POST-01, AC 1)
-Proof: run integration | PASSED tests/integration/test_error_logging_and_promotion.py::test_repeated_error_increments_count
+Proof: run integration | tests/integration/test_error_logging_and_promotion.py::test_repeated_error_increments_count PASSED
 
 **C13** - `add_card` deduplicates by normalized `front_prompt` returning `created: false` and existing `card_id` (POST-02, AC 2)
-Proof: run integration | PASSED tests/integration/test_sqlite_repositories.py::test_add_card_deduplicates_normalized_front
+Proof: run integration | tests/integration/test_sqlite_repositories.py::test_add_card_deduplicates_normalized_front PASSED
 
 **C14** - `end_session(promote_errors=true)` extracts eligible session errors into `auto_extracted` flashcards and records summary metrics (POST-03, AC 3)
-Proof: run integration | PASSED tests/integration/test_post_session_extraction.py::test_end_session_promotes_errors_once
+Proof: run integration | tests/integration/test_post_session_extraction.py::test_end_session_promotes_errors_once PASSED
 
 ---
 
@@ -516,7 +516,7 @@ Proof: run integration | PASSED tests/integration/test_post_session_extraction.p
 The feature's live state, written as it happens - a compaction gives no warning.
 
 **Settled mid-build:** none
-**Dispatched:** batch-1 (Phase 1: T1-T7) returned; batch-2 (Phase 2-3: T8-T15) returned; batch-3 (Phase 4: T16-T20)
+**Dispatched:** batch-1 (Phase 1: T1-T7) returned; batch-2 (Phase 2-3: T8-T15) returned; batch-3 (Phase 4: T16-T20) returned
 **Walked:** none
 
 ---
