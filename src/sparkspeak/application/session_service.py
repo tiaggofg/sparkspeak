@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from sparkspeak.domain.errors import ErrorCode, SparkSpeakError
 from sparkspeak.domain.models import (
+    AddCardResult,
+    CardType,
     Deck,
     ErrorCategory,
     ErrorLogInput,
@@ -15,6 +17,14 @@ from sparkspeak.domain.models import (
     StudySession,
 )
 from sparkspeak.infrastructure.db.repositories import SQLiteRepository
+
+_ERROR_TO_CARD_TYPE: dict[ErrorCategory, CardType] = {
+    "grammar": "grammar_fix",
+    "vocabulary": "vocab",
+    "phrasal_verb": "phrasal_verb",
+    "pronunciation_asr": "pronunciation",
+    "register": "tech_scenario",
+}
 
 _VALID_ERROR_CATEGORIES: tuple[ErrorCategory, ...] = (
     "grammar",
@@ -213,9 +223,42 @@ class SessionService:
         self,
         session_id: str,
         *,
+        promote_errors: bool = True,
         summary_notes: str | None = None,
     ) -> SessionSummary:
-        ended = self._repo.end_session(session_id, summary_notes=summary_notes)
+        existing = self._repo.get_session(session_id)
+        if existing is None:
+            raise SparkSpeakError(
+                error_code=ErrorCode.SESSION_NOT_FOUND,
+                message=f"Session {session_id!r} was not found.",
+                details={"session_id": session_id},
+            )
+
+        session_errors = self._repo.get_session_errors(session_id)
+        recurring = [e for e in session_errors if e.occurrence_count >= 2]
+
+        if existing.status == "ended":
+            return SessionSummary(
+                session_id=existing.id,
+                status=existing.status,
+                started_at=existing.started_at,
+                ended_at=existing.ended_at,
+                cards_reviewed=existing.cards_reviewed,
+                errors_extracted=existing.errors_extracted,
+                summary_notes=existing.summary_notes,
+                promoted_cards=[],
+                recurring_errors=recurring,
+            )
+
+        promoted_cards: list[AddCardResult] = []
+        if promote_errors:
+            promoted_cards = self._promote_session_errors(session_errors)
+
+        ended = self._repo.end_session(
+            session_id,
+            summary_notes=summary_notes,
+            errors_extracted=len(promoted_cards),
+        )
         return SessionSummary(
             session_id=ended.id,
             status=ended.status,
@@ -224,4 +267,38 @@ class SessionService:
             cards_reviewed=ended.cards_reviewed,
             errors_extracted=ended.errors_extracted,
             summary_notes=ended.summary_notes,
+            promoted_cards=promoted_cards,
+            recurring_errors=recurring,
         )
+
+    def _promote_session_errors(self, errors: list[ErrorLogRecord]) -> list[AddCardResult]:
+        promoted: list[AddCardResult] = []
+        deck_slug_cache: dict[int, str] = {}
+        for err in errors:
+            if err.promoted_card_id is not None:
+                continue
+            slug = deck_slug_cache.get(err.deck_id)
+            if slug is None:
+                deck = self._repo.get_deck_by_id(err.deck_id)
+                if deck is None:
+                    continue
+                slug = deck.slug
+                deck_slug_cache[err.deck_id] = slug
+
+            card_type = _ERROR_TO_CARD_TYPE[err.category]
+            front_prompt = f"Fix {err.category}: '{err.utterance_raw}'"[:1000]
+            back_reference = err.correction[:1000]
+            context_example = err.explanation[:1000] if err.explanation else None
+
+            res = self._repo.add_card(
+                deck_slug=slug,
+                front_prompt=front_prompt,
+                back_reference=back_reference,
+                card_type=card_type,
+                context_example=context_example,
+                source_type="auto_extracted",
+            )
+            self._repo.mark_error_promoted(err.id, res.card_id)
+            if res.created:
+                promoted.append(res)
+        return promoted

@@ -435,10 +435,10 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Calling `end_session(promote_errors=true)` creates at most 1 `auto_extracted` card per unique error and populates `error_logs.promoted_card_id`
-- [ ] Updates `study_sessions.ended_at`, `cards_reviewed`, `errors_extracted` idempotently
-- [ ] Integration tests in `tests/integration/test_post_session_extraction.py` pass (4+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit tests/integration -v`
+- [x] Calling `end_session(promote_errors=true)` creates at most 1 `auto_extracted` card per unique error and populates `error_logs.promoted_card_id`
+- [x] Updates `study_sessions.ended_at`, `cards_reviewed`, `errors_extracted` idempotently
+- [x] Integration tests in `tests/integration/test_post_session_extraction.py` pass (4+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit tests/integration -v`
 
 **Tests**: integration
 **Gate**: full

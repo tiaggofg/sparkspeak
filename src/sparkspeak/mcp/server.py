@@ -319,15 +319,21 @@ def create_server(
 
     @server.tool(
         description=(
-            "End an active study session idempotently and return session metrics."
+            "End an active study session idempotently, optionally promoting eligible "
+            "session errors to auto_extracted flashcards, and return session metrics."
         )
     )
     def end_session(
         session_id: str,
+        promote_errors: bool = True,
         summary_notes: str | None = None,
     ) -> types.CallToolResult:
         try:
-            res = session_service.end_session(session_id, summary_notes=summary_notes)
+            res = session_service.end_session(
+                session_id,
+                promote_errors=promote_errors,
+                summary_notes=summary_notes,
+            )
             return _ok_result(
                 {
                     "session_id": res.session_id,
@@ -337,6 +343,26 @@ def create_server(
                     "cards_reviewed": res.cards_reviewed,
                     "errors_extracted": res.errors_extracted,
                     "summary_notes": res.summary_notes,
+                    "promoted_cards": [
+                        {
+                            "card_id": c.card_id,
+                            "created": c.created,
+                            "deck_slug": c.deck_slug,
+                            "due_at": c.due_at,
+                        }
+                        for c in res.promoted_cards
+                    ],
+                    "recurring_errors": [
+                        {
+                            "error_id": e.id,
+                            "category": e.category,
+                            "utterance_raw": e.utterance_raw,
+                            "correction": e.correction,
+                            "occurrence_count": e.occurrence_count,
+                            "promoted_card_id": e.promoted_card_id,
+                        }
+                        for e in res.recurring_errors
+                    ],
                 }
             )
         except SparkSpeakError as err:
