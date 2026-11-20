@@ -163,10 +163,10 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Running migrator twice on fresh and existing DBs is idempotent and enforces WAL + foreign keys
-- [ ] Backup file is created in `.data/backups/` before applying pending migrations to an existing DB
-- [ ] Integration tests in `tests/integration/test_sqlite_migrations.py` pass (4+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit tests/integration -v`
+- [x] Running migrator twice on fresh and existing DBs is idempotent and enforces WAL + foreign keys
+- [x] Backup file is created in `.data/backups/` before applying pending migrations to an existing DB
+- [x] Integration tests in `tests/integration/test_sqlite_migrations.py` pass (4+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit tests/integration -v`
 
 **Tests**: integration
 **Gate**: full
