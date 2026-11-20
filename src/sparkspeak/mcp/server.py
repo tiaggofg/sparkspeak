@@ -33,7 +33,8 @@ from sparkspeak.infrastructure.audio.piper_tts import (  # noqa: E402
     PiperTTSAdapter,
 )
 from sparkspeak.infrastructure.audio.pipewire_device import probe_pipewire_devices  # noqa: E402
-from sparkspeak.infrastructure.audio.ports import AudioStatus  # noqa: E402
+from sparkspeak.infrastructure.audio.ports import AudioStatus, STTEngine  # noqa: E402
+from sparkspeak.infrastructure.audio.whisper_stt import WhisperSTTAdapter  # noqa: E402
 from sparkspeak.infrastructure.db.migrator import run_migrations  # noqa: E402
 from sparkspeak.infrastructure.db.repositories import SQLiteRepository  # noqa: E402
 
@@ -54,7 +55,11 @@ def _error_result(err: SparkSpeakError) -> types.CallToolResult:
     )
 
 
-def create_server(config: SparkSpeakConfig | None = None) -> MCPServer:
+def create_server(
+    config: SparkSpeakConfig | None = None,
+    *,
+    stt_adapter: STTEngine | None = None,
+) -> MCPServer:
     """Create and configure the SparkSpeak MCPServer with SQLite migrations."""
     cfg = config or load_config()
     run_migrations(cfg.db_path, cfg.backups_dir)
@@ -63,19 +68,20 @@ def create_server(config: SparkSpeakConfig | None = None) -> MCPServer:
     review_service = ReviewService(repo)
     session_service = SessionService(repo)
     tts_adapter = PiperTTSAdapter(cfg.models_dir)
+    stt = stt_adapter or WhisperSTTAdapter(cfg.models_dir)
 
     def _probe_audio_status() -> AudioStatus:
         probe = probe_pipewire_devices()
         return AudioStatus(
             tts_ready=tts_adapter.is_ready(),
-            stt_ready=False,
+            stt_ready=stt.is_ready(),
             pipewire_input=probe.has_input,
             pipewire_output=probe.has_output,
         )
 
     audio_service = AudioService(
         tts=tts_adapter,
-        stt=None,
+        stt=stt,
         device_probe=_probe_audio_status,
     )
 
@@ -296,6 +302,36 @@ def create_server(config: SparkSpeakConfig | None = None) -> MCPServer:
                     "spoken": res.spoken,
                     "voice": res.voice,
                     "duration_ms": res.duration_ms,
+                }
+            )
+        except SparkSpeakError as err:
+            return _error_result(err)
+
+    @server.tool(
+        description=(
+            "Record 16kHz mono PCM from PipeWire with Silero VAD endpointing and "
+            "return a verbatim faster-whisper transcript without grammar auto-correction."
+        )
+    )
+    async def listen_and_transcribe(
+        silence_timeout_ms: int = 1500,
+        initial_speech_timeout_ms: int = 10000,
+        max_duration_ms: int = 45000,
+    ) -> types.CallToolResult:
+        try:
+            res = await audio_service.listen_and_transcribe(
+                silence_timeout_ms=silence_timeout_ms,
+                initial_speech_timeout_ms=initial_speech_timeout_ms,
+                max_duration_ms=max_duration_ms,
+            )
+            return _ok_result(
+                {
+                    "speech_detected": res.speech_detected,
+                    "transcript": res.transcript,
+                    "duration_ms": res.duration_ms,
+                    "truncated_at_max_duration": res.truncated_at_max_duration,
+                    "avg_logprob": res.avg_logprob,
+                    "no_speech_prob": res.no_speech_prob,
                 }
             )
         except SparkSpeakError as err:

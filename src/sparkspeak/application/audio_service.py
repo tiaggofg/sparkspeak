@@ -15,6 +15,23 @@ from sparkspeak.infrastructure.audio.ports import (
 MIN_SPEED = 0.75
 MAX_SPEED = 1.25
 MAX_TTS_TEXT_LEN = 2000
+MIN_SILENCE_TIMEOUT_MS = 500
+MAX_SILENCE_TIMEOUT_MS = 5000
+MIN_INITIAL_SPEECH_TIMEOUT_MS = 2000
+MAX_INITIAL_SPEECH_TIMEOUT_MS = 30000
+MIN_MAX_DURATION_MS = 3000
+MAX_MAX_DURATION_MS = 90000
+
+
+def _validate_int_range(value: int, field: str, low: int, high: int) -> None:
+    if isinstance(value, bool) or value < low or value > high:
+        raise SparkSpeakError(
+            error_code=ErrorCode.INVALID_ARGUMENT,
+            message=f"{field} must be between {low} and {high}; got {value!r}.",
+            recoverable=True,
+            fallback_hint="text",
+            details={"field": field, "value": value},
+        )
 
 
 class AudioService:
@@ -102,6 +119,24 @@ class AudioService:
         max_duration_ms: int = 45000,
     ) -> TranscribeResult:
         """Capture and transcribe speech under AudioLock."""
+        _validate_int_range(
+            silence_timeout_ms,
+            "silence_timeout_ms",
+            MIN_SILENCE_TIMEOUT_MS,
+            MAX_SILENCE_TIMEOUT_MS,
+        )
+        _validate_int_range(
+            initial_speech_timeout_ms,
+            "initial_speech_timeout_ms",
+            MIN_INITIAL_SPEECH_TIMEOUT_MS,
+            MAX_INITIAL_SPEECH_TIMEOUT_MS,
+        )
+        _validate_int_range(
+            max_duration_ms,
+            "max_duration_ms",
+            MIN_MAX_DURATION_MS,
+            MAX_MAX_DURATION_MS,
+        )
         if self._stt is None:
             raise SparkSpeakError(
                 error_code=ErrorCode.MICROPHONE_UNAVAILABLE,

@@ -397,9 +397,9 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] `listen_and_transcribe` returns structured `MICROPHONE_UNAVAILABLE` (`fallback_hint: "text"`) on mocked missing mic over MCP stdio
-- [ ] Integration tests in `tests/integration/test_mcp_stt_tool.py` pass (3+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit tests/integration -v`
+- [x] `listen_and_transcribe` returns structured `MICROPHONE_UNAVAILABLE` (`fallback_hint: "text"`) on mocked missing mic over MCP stdio
+- [x] Integration tests in `tests/integration/test_mcp_stt_tool.py` pass (3+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit tests/integration -v`
 
 **Tests**: integration
 **Gate**: full
