@@ -204,10 +204,10 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Input validation enforces `limit in [1, 50]`, text length `<= 1000`, valid `rating`
-- [ ] `end_session` is idempotent on already-ended sessions
-- [ ] Unit tests in `tests/unit/test_review_and_session_service.py` pass (7+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit -v`
+- [x] Input validation enforces `limit in [1, 50]`, text length `<= 1000`, valid `rating`
+- [x] `end_session` is idempotent on already-ended sessions
+- [x] Unit tests in `tests/unit/test_review_and_session_service.py` pass (7+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit -v`
 
 **Tests**: unit
 **Gate**: quick
