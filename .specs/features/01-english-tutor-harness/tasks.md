@@ -376,11 +376,11 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Preserves intentional learner grammar errors verbatim from WAV fixture in `tests/fixtures/audio/`
-- [ ] Returns `speech_detected: false` cleanly on initial silence timeout and `truncated_at_max_duration: true` at max duration
-- [ ] Raises `MICROPHONE_UNAVAILABLE` when input device fails to open
-- [ ] Integration test `tests/integration/test_whisper_wav_fixture.py` passes (4+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit tests/integration -v`
+- [x] Preserves intentional learner grammar errors verbatim from WAV fixture in `tests/fixtures/audio/`
+- [x] Returns `speech_detected: false` cleanly on initial silence timeout and `truncated_at_max_duration: true` at max duration
+- [x] Raises `MICROPHONE_UNAVAILABLE` when input device fails to open
+- [x] Integration test `tests/integration/test_whisper_wav_fixture.py` passes (4+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit tests/integration -v`
 
 **Tests**: integration
 **Gate**: full
@@ -516,7 +516,7 @@ Proof: run integration | PASSED tests/integration/test_post_session_extraction.p
 The feature's live state, written as it happens - a compaction gives no warning.
 
 **Settled mid-build:** none
-**Dispatched:** batch-1 (Phase 1: T1-T7) returned; batch-2 (Phase 2-3: T8-T15)
+**Dispatched:** batch-1 (Phase 1: T1-T7) returned; batch-2 (Phase 2-3: T8-T15) returned; batch-3 (Phase 4: T16-T20)
 **Walked:** none
 
 ---
