@@ -17,6 +17,7 @@ logging.basicConfig(
 from mcp import types  # noqa: E402
 from mcp.server.mcpserver import MCPServer  # noqa: E402
 
+from sparkspeak.application.audio_service import AudioService  # noqa: E402
 from sparkspeak.application.review_service import ReviewService  # noqa: E402
 from sparkspeak.application.session_service import SessionService  # noqa: E402
 from sparkspeak.config import SparkSpeakConfig, load_config  # noqa: E402
@@ -27,6 +28,12 @@ from sparkspeak.domain.models import (  # noqa: E402
     SessionMode,
     SourceType,
 )
+from sparkspeak.infrastructure.audio.piper_tts import (  # noqa: E402
+    DEFAULT_PIPER_VOICE,
+    PiperTTSAdapter,
+)
+from sparkspeak.infrastructure.audio.pipewire_device import probe_pipewire_devices  # noqa: E402
+from sparkspeak.infrastructure.audio.ports import AudioStatus  # noqa: E402
 from sparkspeak.infrastructure.db.migrator import run_migrations  # noqa: E402
 from sparkspeak.infrastructure.db.repositories import SQLiteRepository  # noqa: E402
 
@@ -55,6 +62,22 @@ def create_server(config: SparkSpeakConfig | None = None) -> MCPServer:
     repo = SQLiteRepository(cfg.db_path)
     review_service = ReviewService(repo)
     session_service = SessionService(repo)
+    tts_adapter = PiperTTSAdapter(cfg.models_dir)
+
+    def _probe_audio_status() -> AudioStatus:
+        probe = probe_pipewire_devices()
+        return AudioStatus(
+            tts_ready=tts_adapter.is_ready(),
+            stt_ready=False,
+            pipewire_input=probe.has_input,
+            pipewire_output=probe.has_output,
+        )
+
+    audio_service = AudioService(
+        tts=tts_adapter,
+        stt=None,
+        device_probe=_probe_audio_status,
+    )
 
     server = MCPServer("sparkspeak")
 
@@ -70,10 +93,12 @@ def create_server(config: SparkSpeakConfig | None = None) -> MCPServer:
         input_mode: str = "voice",
     ) -> types.CallToolResult:
         try:
+            audio_status = audio_service.get_audio_status().to_dict()
             res = session_service.start_session(
                 deck_slug=deck_slug,
                 mode=cast(SessionMode, mode),
                 input_mode=cast(InputMode, input_mode),
+                audio_status=audio_status,
             )
             deck_payload = (
                 {
@@ -246,6 +271,43 @@ def create_server(config: SparkSpeakConfig | None = None) -> MCPServer:
             )
         except SparkSpeakError as err:
             return _error_result(err)
+
+    @server.tool(
+        description=(
+            "Synthesize English speech via local Piper ONNX and play PCM audio to "
+            "the default PipeWire output sink."
+        )
+    )
+    async def speak_text(
+        text: str,
+        voice: str = DEFAULT_PIPER_VOICE,
+        speed: float = 1.0,
+        blocking: bool = True,
+    ) -> types.CallToolResult:
+        try:
+            res = await audio_service.speak_text(
+                text,
+                voice=voice,
+                speed=speed,
+                blocking=blocking,
+            )
+            return _ok_result(
+                {
+                    "spoken": res.spoken,
+                    "voice": res.voice,
+                    "duration_ms": res.duration_ms,
+                }
+            )
+        except SparkSpeakError as err:
+            return _error_result(err)
+
+    @server.tool(
+        description=(
+            "Report local TTS/STT model readiness and PipeWire input/output device availability."
+        )
+    )
+    def get_audio_status() -> types.CallToolResult:
+        return _ok_result(audio_service.get_audio_status().to_dict())
 
     return server
 

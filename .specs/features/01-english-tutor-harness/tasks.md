@@ -357,9 +357,9 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] `speak_text` rejects invalid speed/empty text with `INVALID_ARGUMENT` and returns `TTS_MODEL_MISSING` cleanly over MCP stdio
-- [ ] Integration tests in `tests/integration/test_mcp_tts_tool.py` pass (3+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit tests/integration -v`
+- [x] `speak_text` rejects invalid speed/empty text with `INVALID_ARGUMENT` and returns `TTS_MODEL_MISSING` cleanly over MCP stdio
+- [x] Integration tests in `tests/integration/test_mcp_tts_tool.py` pass (3+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit tests/integration -v`
 
 **Tests**: integration
 **Gate**: full
