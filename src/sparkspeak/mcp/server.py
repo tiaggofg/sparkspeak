@@ -89,6 +89,18 @@ def create_server(
     )
 
     server = MCPServer("sparkspeak")
+    _register_session_tools(server, session_service, audio_service)
+    _register_session_tools_tail(server, session_service)
+    _register_review_tools(server, review_service)
+    _register_audio_tools(server, audio_service)
+    return server
+
+
+def _register_session_tools(
+    server: MCPServer,
+    session_service: SessionService,
+    audio_service: AudioService,
+) -> None:
 
     @server.tool(
         description=(
@@ -135,6 +147,7 @@ def create_server(
         except SparkSpeakError as err:
             return _error_result(err)
 
+def _register_review_tools(server: MCPServer, review_service: ReviewService) -> None:
     @server.tool(
         description=(
             "Fetch due review flashcards ordered by due_at ASC followed by up to "
@@ -256,6 +269,10 @@ def create_server(
         except SparkSpeakError as err:
             return _error_result(err)
 
+def _register_session_tools_tail(
+    server: MCPServer,
+    session_service: SessionService,
+) -> None:
     @server.tool(
         description=(
             "Record a conversation turn and upsert detected learner errors into "
@@ -368,6 +385,7 @@ def create_server(
         except SparkSpeakError as err:
             return _error_result(err)
 
+def _register_audio_tools(server: MCPServer, audio_service: AudioService) -> None:
     @server.tool(
         description=(
             "Synthesize English speech via local Piper ONNX and play PCM audio to "
@@ -434,8 +452,6 @@ def create_server(
     )
     def get_audio_status() -> types.CallToolResult:
         return _ok_result(audio_service.get_audio_status().to_dict())
-
-    return server
 
 
 def main() -> None:

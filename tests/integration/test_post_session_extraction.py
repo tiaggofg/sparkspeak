@@ -37,6 +37,14 @@ def _server_params(tmp_path: Path) -> StdioServerParameters:
     )
 
 
+def _count_auto_extracted(db_path: Path) -> int:
+    with sqlite3.connect(db_path) as conn:
+        count: int = conn.execute(
+            "SELECT COUNT(*) FROM cards WHERE source_type = 'auto_extracted'"
+        ).fetchone()[0]
+    return count
+
+
 def _parse_json(result: Any) -> dict[str, Any]:
     assert result.content
     parsed: dict[str, Any] = json.loads(result.content[0].text)
@@ -118,11 +126,7 @@ def test_end_session_promotes_errors_once(tmp_path: Path) -> None:
     assert summary_2.ended_at == summary_1.ended_at
     assert summary_2.errors_extracted == 1
 
-    with sqlite3.connect(db_path) as conn:
-        auto_count_after = conn.execute(
-            "SELECT COUNT(*) FROM cards WHERE source_type = 'auto_extracted'"
-        ).fetchone()[0]
-    assert auto_count_after == 1
+    assert _count_auto_extracted(db_path) == 1
 
 
 def test_end_session_without_promotion_leaves_errors_unpromoted(tmp_path: Path) -> None:
@@ -150,11 +154,8 @@ def test_end_session_without_promotion_leaves_errors_unpromoted(tmp_path: Path) 
     assert summary.promoted_cards == []
 
     with sqlite3.connect(db_path) as conn:
-        auto_count = conn.execute(
-            "SELECT COUNT(*) FROM cards WHERE source_type = 'auto_extracted'"
-        ).fetchone()[0]
         promoted_id = conn.execute("SELECT promoted_card_id FROM error_logs").fetchone()[0]
-    assert auto_count == 0
+    assert _count_auto_extracted(db_path) == 0
     assert promoted_id is None
 
 
@@ -187,11 +188,7 @@ def test_end_session_deduplicates_against_existing_card(tmp_path: Path) -> None:
     summary = svc.end_session(started.session_id, promote_errors=True)
     assert summary.errors_extracted == 0
     assert summary.promoted_cards == []
-    with sqlite3.connect(db_path) as conn:
-        auto_count = conn.execute(
-            "SELECT COUNT(*) FROM cards WHERE source_type = 'auto_extracted'"
-        ).fetchone()[0]
-    assert auto_count == 0
+    assert _count_auto_extracted(db_path) == 0
 
 
 def test_mcp_stdio_end_session_promotes_errors(tmp_path: Path) -> None:

@@ -455,10 +455,10 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] `docs/` (`arquitetura-c4.md`, `modelo-dominio-e-dados.md`, `fluxos-e-sequencias.md`, `seguranca-e-privacidade.md`, `deploy-e-ci-cd.md`) and `README.md` match implemented code and SQLite schema
-- [ ] `.agents/scripts/quality-check.sh --up` exits `0` (lint + SonarQube Quality Gate `OK`)
-- [ ] Live PipeWire TTS + STT check passes on Ubuntu 24.04
-- [ ] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
+- [x] `docs/` (`arquitetura-c4.md`, `modelo-dominio-e-dados.md`, `fluxos-e-sequencias.md`, `seguranca-e-privacidade.md`, `deploy-e-ci-cd.md`) and `README.md` match implemented code and SQLite schema
+- [ ] `.agents/scripts/quality-check.sh --up` exits `0` (lint + SonarQube Quality Gate `OK`) — *blocked: SonarQube reported `new_coverage=0.0%` (no `coverage.xml` in scanner), `new_security_hotspots_reviewed=0.0%`, and 8 pre-existing Batch 1/2 code smells; Batch 3 code smells fixed*
+- [ ] Live PipeWire TTS + STT check passes on Ubuntu 24.04 — *blocked in container: `libportaudio2` missing (`sparkspeak-health` reports `PortAudio library not found`)*
+- [x] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
 
 **Tests**: none
 **Gate**: build
