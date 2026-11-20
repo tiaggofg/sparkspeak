@@ -338,9 +338,9 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] `sparkspeak-health` checks `.data/models/` and PipeWire devices and outputs JSON status without crashing on missing devices
-- [ ] Unit tests in `tests/unit/test_cli_setup.py` pass (2+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit -v`
+- [x] `sparkspeak-health` checks `.data/models/` and PipeWire devices and outputs JSON status without crashing on missing devices
+- [x] Unit tests in `tests/unit/test_cli_setup.py` pass (2+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit -v`
 
 **Tests**: unit
 **Gate**: quick
