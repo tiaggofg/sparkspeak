@@ -280,8 +280,8 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Reference files document the 1-4 FSRS rating rubric, 3 deck personas (`conversational`, `phrasal-verbs`, `tech-meetings`), and error classification categories
-- [ ] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
+- [x] Reference files document the 1-4 FSRS rating rubric, 3 deck personas (`conversational`, `phrasal-verbs`, `tech-meetings`), and error classification categories
+- [x] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
 
 **Tests**: none
 **Gate**: build
