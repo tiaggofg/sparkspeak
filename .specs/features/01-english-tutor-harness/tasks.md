@@ -318,10 +318,10 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Missing `.onnx` model raises recoverable `TTS_MODEL_MISSING` with `fallback_hint: "text"`
-- [ ] Unavailable PipeWire sink raises recoverable `AUDIO_OUTPUT_UNAVAILABLE` with `fallback_hint: "text"`
-- [ ] Unit tests in `tests/unit/test_piper_tts.py` pass (4+ tests with mocked `sounddevice`/model)
-- [ ] Gate check passes: `uv run pytest tests/unit -v`
+- [x] Missing `.onnx` model raises recoverable `TTS_MODEL_MISSING` with `fallback_hint: "text"`
+- [x] Unavailable PipeWire sink raises recoverable `AUDIO_OUTPUT_UNAVAILABLE` with `fallback_hint: "text"`
+- [x] Unit tests in `tests/unit/test_piper_tts.py` pass (4+ tests with mocked `sounddevice`/model)
+- [x] Gate check passes: `uv run pytest tests/unit -v`
 
 **Tests**: unit
 **Gate**: quick
