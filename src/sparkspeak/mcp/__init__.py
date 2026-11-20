@@ -1,0 +1,1 @@
+"""SparkSpeak MCP server package."""

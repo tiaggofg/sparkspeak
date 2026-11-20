@@ -224,9 +224,9 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Zero non-JSON-RPC bytes are emitted to `stdout` during server startup and tool execution
-- [ ] Integration test `tests/integration/test_mcp_stdio_protocol.py` spawns `sparkspeak-mcp` over stdio and completes `start_session` -> `get_due_cards` -> `submit_review` -> `end_session` (4+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit tests/integration -v`
+- [x] Zero non-JSON-RPC bytes are emitted to `stdout` during server startup and tool execution
+- [x] Integration test `tests/integration/test_mcp_stdio_protocol.py` spawns `sparkspeak-mcp` over stdio and completes `start_session` -> `get_due_cards` -> `submit_review` -> `end_session` (4+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit tests/integration -v`
 
 **Tests**: integration
 **Gate**: full
@@ -516,7 +516,7 @@ Proof: run integration | PASSED tests/integration/test_post_session_extraction.p
 The feature's live state, written as it happens - a compaction gives no warning.
 
 **Settled mid-build:** none
-**Dispatched:** batch-1 (Phase 1: T1-T7)
+**Dispatched:** batch-1 (Phase 1: T1-T7) returned; batch-2 (Phase 2-3: T8-T15)
 **Walked:** none
 
 ---
