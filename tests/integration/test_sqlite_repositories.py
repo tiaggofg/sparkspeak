@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from sparkspeak.application.review_service import ReviewService
 from sparkspeak.domain.errors import ErrorCode, SparkSpeakError
 from sparkspeak.domain.models import ErrorLogInput
 from sparkspeak.domain.srs_engine import SRSEngine
@@ -93,6 +94,21 @@ def test_submit_review_updates_fsrs_and_logs(tmp_path: Path) -> None:
     assert updated_card.reps == 1
     assert updated_card.due_at == scheduled.next_due_at
     assert updated_card.stability == pytest.approx(scheduled.stability)
+    assert updated_card.difficulty == pytest.approx(scheduled.difficulty)
+    assert updated_card.fsrs_state == scheduled.fsrs_state_int
+
+    with open_connection(tmp_path / "sparkspeak.db") as conn:
+        log_rows = conn.execute(
+            "SELECT card_id, session_id, rating, fsrs_state_after, scheduled_days "
+            "FROM review_logs WHERE card_id = ?",
+            (card.id,),
+        ).fetchall()
+    assert len(log_rows) == 1
+    assert log_rows[0]["card_id"] == card.id
+    assert log_rows[0]["session_id"] == session.id
+    assert log_rows[0]["rating"] == 3
+    assert log_rows[0]["fsrs_state_after"] == scheduled.fsrs_state_int
+    assert log_rows[0]["scheduled_days"] == scheduled.scheduled_days
 
     updated_session = repo.get_session(session.id)
     assert updated_session is not None
@@ -110,6 +126,56 @@ def test_submit_review_updates_fsrs_and_logs(tmp_path: Path) -> None:
     assert replayed.idempotent_replay is True
     assert repo.get_card_by_id(card.id).reps == 1  # type: ignore[union-attr]
     assert repo.get_session(session.id).cards_reviewed == 1  # type: ignore[union-attr]
+    with open_connection(tmp_path / "sparkspeak.db") as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM review_logs WHERE card_id = ?", (card.id,)
+        ).fetchone()[0]
+    assert count == 1
+
+
+def test_submit_review_invalid_rating_and_unknown_card_leave_db_unchanged(
+    tmp_path: Path,
+) -> None:
+    repo = _setup_repo(tmp_path)
+    engine = SRSEngine(desired_retention=0.90)
+    review_service = ReviewService(repo=repo, srs_engine=engine)
+    session = repo.create_session(mode="active_review", input_mode_default="text")
+    due = repo.get_due_cards(deck_slug="phrasal-verbs", limit=1)
+    card = due.cards[0]
+
+    with pytest.raises(SparkSpeakError) as bad_rating_exc:
+        review_service.submit_review(
+            card_id=card.id,
+            rating=5,
+            user_response_raw="invalid rating attempt",
+            input_mode="text",
+            session_id=session.id,
+        )
+    assert bad_rating_exc.value.error_code is ErrorCode.INVALID_RATING
+
+    with pytest.raises(SparkSpeakError) as missing_card_exc:
+        review_service.submit_review(
+            card_id=999999,
+            rating=3,
+            user_response_raw="unknown card attempt",
+            input_mode="text",
+            session_id=session.id,
+        )
+    assert missing_card_exc.value.error_code is ErrorCode.CARD_NOT_FOUND
+
+    unchanged_card = repo.get_card_by_id(card.id)
+    assert unchanged_card is not None
+    assert unchanged_card.reps == card.reps
+    assert unchanged_card.due_at == card.due_at
+    assert unchanged_card.fsrs_state == card.fsrs_state
+
+    unchanged_session = repo.get_session(session.id)
+    assert unchanged_session is not None
+    assert unchanged_session.cards_reviewed == 0
+
+    with open_connection(tmp_path / "sparkspeak.db") as conn:
+        log_count = conn.execute("SELECT COUNT(*) FROM review_logs").fetchone()[0]
+    assert log_count == 0
 
 
 def test_add_card_deduplicates_normalized_front(tmp_path: Path) -> None:

@@ -83,48 +83,62 @@ def test_text_mode_never_invokes_audio(tmp_path: Path) -> None:
         ):
             await session.initialize()
 
-            start_res = await session.call_tool(
-                "start_session",
-                {"deck_slug": "conversational", "mode": "roleplay", "input_mode": "text"},
-            )
-            assert not start_res.is_error
-            start_data = _parse_tool_json(start_res)
-            assert start_data["effective_input_mode"] == "text"
-            session_id = start_data["session_id"]
+            for mode in ("active_review", "roleplay"):
+                start_res = await session.call_tool(
+                    "start_session",
+                    {"deck_slug": "conversational", "mode": mode, "input_mode": "text"},
+                )
+                assert not start_res.is_error
+                start_data = _parse_tool_json(start_res)
+                assert start_data["effective_input_mode"] == "text"
+                session_id = start_data["session_id"]
 
-            due_res = await session.call_tool(
-                "get_due_cards",
-                {"deck_slug": "conversational", "limit": 2},
-            )
-            assert not due_res.is_error
-            due_data = _parse_tool_json(due_res)
-            assert len(due_data["cards"]) >= 1
-            card_id = due_data["cards"][0]["card_id"]
+                due_res = await session.call_tool(
+                    "get_due_cards",
+                    {"deck_slug": "conversational", "limit": 2},
+                )
+                assert not due_res.is_error
+                due_data = _parse_tool_json(due_res)
+                assert len(due_data["cards"]) >= 1
+                card_id = due_data["cards"][0]["card_id"]
 
-            rev_res = await session.call_tool(
-                "submit_review",
-                {
-                    "card_id": card_id,
-                    "rating": 3,
-                    "user_response_raw": "How have you been lately?",
-                    "input_mode": "text",
-                    "session_id": session_id,
-                },
-            )
-            assert not rev_res.is_error
-            rev_data = _parse_tool_json(rev_res)
-            assert rev_data["card_id"] == card_id
-            assert rev_data["rating"] == 3
-            assert rev_data["next_due_at"]
+                rev_res = await session.call_tool(
+                    "submit_review",
+                    {
+                        "card_id": card_id,
+                        "rating": 3,
+                        "user_response_raw": "How have you been lately?",
+                        "input_mode": "text",
+                        "session_id": session_id,
+                    },
+                )
+                assert not rev_res.is_error
+                rev_data = _parse_tool_json(rev_res)
+                assert rev_data["card_id"] == card_id
+                assert rev_data["rating"] == 3
+                assert rev_data["next_due_at"]
 
-            end_res = await session.call_tool(
-                "end_session",
-                {"session_id": session_id, "summary_notes": "Text roleplay completed"},
-            )
-            assert not end_res.is_error
-            end_data = _parse_tool_json(end_res)
-            assert end_data["status"] == "ended"
-            assert end_data["cards_reviewed"] == 1
+                if mode == "roleplay":
+                    turn_res = await session.call_tool(
+                        "log_turn_and_errors",
+                        {
+                            "session_id": session_id,
+                            "speaker": "user",
+                            "raw_transcript": "How have you been lately?",
+                            "input_mode": "text",
+                            "errors": [],
+                        },
+                    )
+                    assert not turn_res.is_error
+
+                end_res = await session.call_tool(
+                    "end_session",
+                    {"session_id": session_id, "summary_notes": f"Text {mode} completed"},
+                )
+                assert not end_res.is_error
+                end_data = _parse_tool_json(end_res)
+                assert end_data["status"] == "ended"
+                assert end_data["cards_reviewed"] == 1
 
     asyncio.run(_run())
 

@@ -477,7 +477,7 @@ Proof: run integration | tests/integration/test_sqlite_repositories.py::test_get
 Proof: run integration | tests/integration/test_sqlite_repositories.py::test_submit_review_updates_fsrs_and_logs PASSED
 
 **C4** - `submit_review` rejects invalid rating outside `{1..4}` with `INVALID_RATING` and leaves DB unchanged (SRS-04, AC 4)
-Proof: run unit | tests/unit/test_srs_engine.py::test_invalid_rating_raises_without_mutation[0] PASSED
+Proof: run integration | tests/integration/test_sqlite_repositories.py::test_submit_review_invalid_rating_and_unknown_card_leave_db_unchanged PASSED
 
 **C5** - Text mode session runs `active_review` and `roleplay` without calling audio hardware tools (SKILL-01, AC 5)
 Proof: run integration | tests/integration/test_mcp_stdio_protocol.py::test_text_mode_never_invokes_audio PASSED
@@ -516,7 +516,7 @@ Proof: run integration | tests/integration/test_post_session_extraction.py::test
 The feature's live state, written as it happens - a compaction gives no warning.
 
 **Settled mid-build:** none
-**Dispatched:** batch-1 (Phase 1: T1-T7) returned; batch-2 (Phase 2-3: T8-T15) returned; batch-3 (Phase 4: T16-T20) returned
+**Dispatched:** batch-1 (Phase 1: T1-T7) returned; batch-2 (Phase 2-3: T8-T15) returned; batch-3 (Phase 4: T16-T20) returned; verifier at 296decf returned
 **Walked:** none
 
 ---
