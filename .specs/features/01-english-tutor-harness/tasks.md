@@ -261,9 +261,9 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] `SKILL.md` includes valid YAML frontmatter (`name: english-tutor`, descriptive trigger `description`)
-- [ ] Covers `active_review`, `roleplay`, text-only fallback, and mandatory `submit_review` / `end_session` calls
-- [ ] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
+- [x] `SKILL.md` includes valid YAML frontmatter (`name: english-tutor`, descriptive trigger `description`)
+- [x] Covers `active_review`, `roleplay`, text-only fallback, and mandatory `submit_review` / `end_session` calls
+- [x] Gate check passes: `uv run ruff check src tests && uv run mypy src && uv run pytest -v`
 
 **Tests**: none
 **Gate**: build
