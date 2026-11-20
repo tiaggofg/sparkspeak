@@ -298,10 +298,10 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Concurrent TTS/STT invocations serialize cleanly under `asyncio.Lock`
-- [ ] Validates `speed in [0.75, 1.25]` and non-empty `text`, raising `INVALID_ARGUMENT` otherwise
-- [ ] Unit tests in `tests/unit/test_audio_service.py` pass (5+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit -v`
+- [x] Concurrent TTS/STT invocations serialize cleanly under `asyncio.Lock`
+- [x] Validates `speed in [0.75, 1.25]` and non-empty `text`, raising `INVALID_ARGUMENT` otherwise
+- [x] Unit tests in `tests/unit/test_audio_service.py` pass (5+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit -v`
 
 **Tests**: unit
 **Gate**: quick
