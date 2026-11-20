@@ -21,12 +21,15 @@ from sparkspeak.application.audio_service import AudioService  # noqa: E402
 from sparkspeak.application.review_service import ReviewService  # noqa: E402
 from sparkspeak.application.session_service import SessionService  # noqa: E402
 from sparkspeak.config import SparkSpeakConfig, load_config  # noqa: E402
-from sparkspeak.domain.errors import SparkSpeakError  # noqa: E402
+from sparkspeak.domain.errors import ErrorCode, SparkSpeakError  # noqa: E402
 from sparkspeak.domain.models import (  # noqa: E402
     CardType,
+    ErrorCategory,
+    ErrorLogInput,
     InputMode,
     SessionMode,
     SourceType,
+    Speaker,
 )
 from sparkspeak.infrastructure.audio.piper_tts import (  # noqa: E402
     DEFAULT_PIPER_VOICE,
@@ -249,6 +252,67 @@ def create_server(
                     "deck_slug": res.deck_slug,
                     "due_at": res.due_at,
                 }
+            )
+        except SparkSpeakError as err:
+            return _error_result(err)
+
+    @server.tool(
+        description=(
+            "Record a conversation turn and upsert detected learner errors into "
+            "error_logs with SHA-256 fingerprint deduplication."
+        )
+    )
+    def log_turn_and_errors(
+        session_id: str,
+        speaker: str,
+        raw_transcript: str,
+        input_mode: str,
+        deck_slug: str | None = None,
+        audio_duration_ms: int | None = None,
+        errors: list[dict[str, str]] | None = None,
+    ) -> types.CallToolResult:
+        try:
+            error_inputs = [
+                ErrorLogInput(
+                    category=cast(ErrorCategory, item["category"]),
+                    utterance_raw=str(item["utterance_raw"]),
+                    correction=str(item["correction"]),
+                    explanation=str(item.get("explanation", "")),
+                )
+                for item in (errors or [])
+            ]
+            res = session_service.log_turn_and_errors(
+                session_id=session_id,
+                speaker=cast(Speaker, speaker),
+                raw_transcript=raw_transcript,
+                input_mode=cast(InputMode, input_mode),
+                deck_slug=deck_slug,
+                audio_duration_ms=audio_duration_ms,
+                errors=error_inputs,
+            )
+            return _ok_result(
+                {
+                    "session_id": res.session_id,
+                    "turn_index": res.turn_index,
+                    "errors": [
+                        {
+                            "error_id": e.id,
+                            "category": e.category,
+                            "fingerprint_hash": e.fingerprint_hash,
+                            "occurrence_count": e.occurrence_count,
+                            "promoted_card_id": e.promoted_card_id,
+                        }
+                        for e in res.errors
+                    ],
+                }
+            )
+        except (KeyError, TypeError) as exc:
+            return _error_result(
+                SparkSpeakError(
+                    error_code=ErrorCode.INVALID_ARGUMENT,
+                    message=f"Malformed error item payload: {exc}",
+                    details={"field": "errors"},
+                )
             )
         except SparkSpeakError as err:
             return _error_result(err)

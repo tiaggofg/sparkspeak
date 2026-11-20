@@ -416,9 +416,9 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Repeated mistakes increment `error_logs.occurrence_count` instead of creating duplicate error patterns
-- [ ] Integration tests in `tests/integration/test_error_logging_and_promotion.py` pass (4+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit tests/integration -v`
+- [x] Repeated mistakes increment `error_logs.occurrence_count` instead of creating duplicate error patterns
+- [x] Integration tests in `tests/integration/test_error_logging_and_promotion.py` pass (4+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit tests/integration -v`
 
 **Tests**: integration
 **Gate**: full
