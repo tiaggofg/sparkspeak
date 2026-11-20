@@ -183,11 +183,11 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] `get_due_cards` returns due reviews ordered by `due_at ASC` before up to `new_cards_limit` unseen cards
-- [ ] `submit_review` updates `cards` and inserts `review_logs` atomically, returning cached output on duplicate `idempotency_key`
-- [ ] `add_card` deduplicates by `(deck_id, normalized_front)` returning `created: false` on conflict
-- [ ] Integration tests in `tests/integration/test_sqlite_repositories.py` pass (6+ tests)
-- [ ] Gate check passes: `uv run pytest tests/unit tests/integration -v`
+- [x] `get_due_cards` returns due reviews ordered by `due_at ASC` before up to `new_cards_limit` unseen cards
+- [x] `submit_review` updates `cards` and inserts `review_logs` atomically, returning cached output on duplicate `idempotency_key`
+- [x] `add_card` deduplicates by `(deck_id, normalized_front)` returning `created: false` on conflict
+- [x] Integration tests in `tests/integration/test_sqlite_repositories.py` pass (6+ tests)
+- [x] Gate check passes: `uv run pytest tests/unit tests/integration -v`
 
 **Tests**: integration
 **Gate**: full
