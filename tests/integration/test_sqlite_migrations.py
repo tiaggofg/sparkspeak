@@ -8,9 +8,11 @@ import pytest
 from sparkspeak.infrastructure.db.connection import open_connection
 from sparkspeak.infrastructure.db.migrator import run_migrations
 
+_DB_FILENAME = "sparkspeak.db"
+
 
 def test_migrations_idempotent_wal_fk(tmp_path: Path) -> None:
-    db_path = tmp_path / "data" / "sparkspeak.db"
+    db_path = tmp_path / "data" / _DB_FILENAME
     backups_dir = tmp_path / "backups"
 
     applied_first = run_migrations(db_path=db_path, backups_dir=backups_dir)
@@ -45,7 +47,7 @@ def test_migrations_idempotent_wal_fk(tmp_path: Path) -> None:
 
 
 def test_seed_decks_and_cards_are_loaded_idempotently(tmp_path: Path) -> None:
-    db_path = tmp_path / "sparkspeak.db"
+    db_path = tmp_path / _DB_FILENAME
     backups_dir = tmp_path / "backups"
 
     run_migrations(db_path=db_path, backups_dir=backups_dir)
@@ -60,7 +62,7 @@ def test_seed_decks_and_cards_are_loaded_idempotently(tmp_path: Path) -> None:
 
 
 def test_backup_created_before_pending_migration_on_existing_db(tmp_path: Path) -> None:
-    db_path = tmp_path / "sparkspeak.db"
+    db_path = tmp_path / _DB_FILENAME
     backups_dir = tmp_path / "backups"
 
     # Pre-create an existing non-empty DB without schema_migrations
@@ -77,7 +79,7 @@ def test_backup_created_before_pending_migration_on_existing_db(tmp_path: Path) 
 
 
 def test_foreign_key_constraint_is_enforced_on_connection(tmp_path: Path) -> None:
-    db_path = tmp_path / "sparkspeak.db"
+    db_path = tmp_path / _DB_FILENAME
     backups_dir = tmp_path / "backups"
     run_migrations(db_path=db_path, backups_dir=backups_dir)
 

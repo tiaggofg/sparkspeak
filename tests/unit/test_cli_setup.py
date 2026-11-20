@@ -9,6 +9,8 @@ from sparkspeak.cli import setup_models
 from sparkspeak.config import SparkSpeakConfig
 from sparkspeak.infrastructure.audio.pipewire_device import DeviceProbeResult
 
+_DATA_DIR = ".data"
+
 
 def test_health_reports_json_without_crashing_on_missing_devices(
     tmp_path: Path,
@@ -18,9 +20,9 @@ def test_health_reports_json_without_crashing_on_missing_devices(
     """sparkspeak-health outputs valid JSON even when models and PipeWire are missing."""
     cfg = SparkSpeakConfig(
         project_root=tmp_path,
-        db_path=tmp_path / ".data" / "sparkspeak.db",
-        backups_dir=tmp_path / ".data" / "backups",
-        models_dir=tmp_path / ".data" / "models",
+        db_path=tmp_path / _DATA_DIR / "sparkspeak.db",
+        backups_dir=tmp_path / _DATA_DIR / "backups",
+        models_dir=tmp_path / _DATA_DIR / "models",
     )
     monkeypatch.setattr(setup_models, "load_config", lambda: cfg)
     monkeypatch.setattr(
@@ -45,11 +47,11 @@ def test_health_and_setup_models_detect_installed_models(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """setup_models populates .data/models and health reports ready=True."""
-    models_dir = tmp_path / ".data" / "models"
+    models_dir = tmp_path / _DATA_DIR / "models"
     cfg = SparkSpeakConfig(
         project_root=tmp_path,
-        db_path=tmp_path / ".data" / "sparkspeak.db",
-        backups_dir=tmp_path / ".data" / "backups",
+        db_path=tmp_path / _DATA_DIR / "sparkspeak.db",
+        backups_dir=tmp_path / _DATA_DIR / "backups",
         models_dir=models_dir,
     )
 

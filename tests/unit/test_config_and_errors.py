@@ -8,6 +8,8 @@ import pytest
 from sparkspeak.config import SparkSpeakConfig, load_config
 from sparkspeak.domain.errors import ErrorCode, SparkSpeakError
 
+_DATA_DIR = ".data"
+
 
 def test_default_config_resolves_dot_data_paths(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -19,9 +21,9 @@ def test_default_config_resolves_dot_data_paths(
     cfg = load_config(project_root=tmp_path)
 
     assert isinstance(cfg, SparkSpeakConfig)
-    assert cfg.db_path == tmp_path / ".data" / "sparkspeak.db"
-    assert cfg.backups_dir == tmp_path / ".data" / "backups"
-    assert cfg.models_dir == tmp_path / ".data" / "models"
+    assert cfg.db_path == tmp_path / _DATA_DIR / "sparkspeak.db"
+    assert cfg.backups_dir == tmp_path / _DATA_DIR / "backups"
+    assert cfg.models_dir == tmp_path / _DATA_DIR / "models"
 
 
 def test_config_honors_sparkspeak_env_overrides(

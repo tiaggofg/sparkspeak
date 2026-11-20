@@ -8,6 +8,9 @@ from sparkspeak.domain.errors import ErrorCode, SparkSpeakError
 from sparkspeak.domain.models import Card
 from sparkspeak.domain.srs_engine import SRSEngine
 
+_DEFAULT_DUE_ISO = "2026-11-20T12:00:00.000Z"
+_UTC_OFFSET = "+00:00"
+
 
 def _make_card(
     *,
@@ -18,7 +21,7 @@ def _make_card(
     step: int | None = 0,
     reps: int = 0,
     lapses: int = 0,
-    due_at: str = "2026-11-20T12:00:00.000Z",
+    due_at: str = _DEFAULT_DUE_ISO,
     last_review_at: str | None = None,
 ) -> Card:
     return Card(
@@ -62,7 +65,7 @@ def test_new_card_good_rating_computes_deterministic_schedule() -> None:
     assert result_a.difficulty is not None and result_a.difficulty > 0
     assert result_a.reps == 1
     assert result_a.lapses == 0
-    assert datetime.fromisoformat(result_a.next_due_at.replace("Z", "+00:00")) > now
+    assert datetime.fromisoformat(result_a.next_due_at.replace("Z", _UTC_OFFSET)) > now
 
 
 def test_new_card_easy_schedules_further_than_again() -> None:
@@ -73,8 +76,8 @@ def test_new_card_easy_schedules_further_than_again() -> None:
     again = engine.schedule_review(card, rating=1, now=now)
     easy = engine.schedule_review(card, rating=4, now=now)
 
-    again_due = datetime.fromisoformat(again.next_due_at.replace("Z", "+00:00"))
-    easy_due = datetime.fromisoformat(easy.next_due_at.replace("Z", "+00:00"))
+    again_due = datetime.fromisoformat(again.next_due_at.replace("Z", _UTC_OFFSET))
+    easy_due = datetime.fromisoformat(easy.next_due_at.replace("Z", _UTC_OFFSET))
 
     assert easy_due > again_due
     assert easy.scheduled_days >= again.scheduled_days
@@ -92,7 +95,7 @@ def test_review_card_again_transitions_to_relearning_and_increments_lapses() -> 
         step=None,
         reps=3,
         lapses=0,
-        due_at="2026-11-20T12:00:00.000Z",
+        due_at=_DEFAULT_DUE_ISO,
         last_review_at="2026-11-15T12:00:00.000Z",
     )
     now = datetime(2026, 11, 20, 12, 0, 0, tzinfo=UTC)
@@ -115,7 +118,7 @@ def test_review_card_good_remains_in_review_and_grows_interval() -> None:
         step=None,
         reps=3,
         lapses=0,
-        due_at="2026-11-20T12:00:00.000Z",
+        due_at=_DEFAULT_DUE_ISO,
         last_review_at="2026-11-15T12:00:00.000Z",
     )
     now = datetime(2026, 11, 20, 12, 0, 0, tzinfo=UTC)
@@ -139,7 +142,7 @@ def test_relearning_card_good_graduates_back_to_review() -> None:
         step=0,
         reps=4,
         lapses=1,
-        due_at="2026-11-20T12:00:00.000Z",
+        due_at=_DEFAULT_DUE_ISO,
         last_review_at="2026-11-20T11:50:00.000Z",
     )
     now = datetime(2026, 11, 20, 12, 0, 0, tzinfo=UTC)

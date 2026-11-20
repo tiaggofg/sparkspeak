@@ -17,6 +17,8 @@ from sparkspeak.domain.models import ErrorLogInput
 from sparkspeak.infrastructure.db.migrator import run_migrations
 from sparkspeak.infrastructure.db.repositories import SQLiteRepository
 
+_COUNT_AUTO_EXTRACTED_SQL = "SELECT COUNT(*) FROM cards WHERE source_type = 'auto_extracted'"
+
 
 def _setup(tmp_path: Path) -> tuple[SessionService, SQLiteRepository, Path]:
     cfg = load_config(project_root=tmp_path)
@@ -40,7 +42,7 @@ def _server_params(tmp_path: Path) -> StdioServerParameters:
 def _count_auto_extracted(db_path: Path) -> int:
     with sqlite3.connect(db_path) as conn:
         count: int = conn.execute(
-            "SELECT COUNT(*) FROM cards WHERE source_type = 'auto_extracted'"
+            _COUNT_AUTO_EXTRACTED_SQL
         ).fetchone()[0]
     return count
 

@@ -32,6 +32,49 @@ from sparkspeak.infrastructure.db.connection import open_connection
 
 _NON_ALNUM_RE = re.compile(r"[^\w\s]", flags=re.UNICODE)
 _WHITESPACE_RE = re.compile(r"\s+")
+_SELECT_SESSION_BY_ID = "SELECT * FROM study_sessions WHERE id = ?"
+
+
+def _find_idempotent_review(
+    conn: sqlite3.Connection,
+    idempotency_key: str | None,
+) -> ReviewResult | None:
+    if idempotency_key is None:
+        return None
+    existing = conn.execute(
+        """
+        SELECT rl.*, c.due_at, c.step, c.reps, c.lapses
+        FROM review_logs rl
+        JOIN cards c ON c.id = rl.card_id
+        WHERE rl.idempotency_key = ?
+        """,
+        (idempotency_key,),
+    ).fetchone()
+    if existing is None:
+        return None
+    state_int = int(existing["fsrs_state_after"])
+    return ReviewResult(
+        card_id=int(existing["card_id"]),
+        rating=int(existing["rating"]),
+        fsrs_state=_STATE_NAMES[state_int],
+        fsrs_state_int=state_int,
+        scheduled_days=int(existing["scheduled_days"]),
+        next_due_at=str(existing["due_at"]),
+        stability=(
+            float(existing["stability_after"])
+            if existing["stability_after"] is not None
+            else None
+        ),
+        difficulty=(
+            float(existing["difficulty_after"])
+            if existing["difficulty_after"] is not None
+            else None
+        ),
+        step=int(existing["step"]) if existing["step"] is not None else None,
+        reps=int(existing["reps"]),
+        lapses=int(existing["lapses"]),
+        idempotent_replay=True,
+    )
 
 _STATE_NAMES: dict[int, str] = {
     1: "learning",
@@ -252,41 +295,10 @@ class SQLiteRepository:
         with open_connection(self.db_path) as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
-                if idempotency_key is not None:
-                    existing = conn.execute(
-                        """
-                        SELECT rl.*, c.due_at, c.step, c.reps, c.lapses
-                        FROM review_logs rl
-                        JOIN cards c ON c.id = rl.card_id
-                        WHERE rl.idempotency_key = ?
-                        """,
-                        (idempotency_key,),
-                    ).fetchone()
-                    if existing is not None:
-                        conn.execute("COMMIT")
-                        state_int = int(existing["fsrs_state_after"])
-                        return ReviewResult(
-                            card_id=int(existing["card_id"]),
-                            rating=int(existing["rating"]),
-                            fsrs_state=_STATE_NAMES[state_int],
-                            fsrs_state_int=state_int,
-                            scheduled_days=int(existing["scheduled_days"]),
-                            next_due_at=str(existing["due_at"]),
-                            stability=(
-                                float(existing["stability_after"])
-                                if existing["stability_after"] is not None
-                                else None
-                            ),
-                            difficulty=(
-                                float(existing["difficulty_after"])
-                                if existing["difficulty_after"] is not None
-                                else None
-                            ),
-                            step=int(existing["step"]) if existing["step"] is not None else None,
-                            reps=int(existing["reps"]),
-                            lapses=int(existing["lapses"]),
-                            idempotent_replay=True,
-                        )
+                replayed = _find_idempotent_review(conn, idempotency_key)
+                if replayed is not None:
+                    conn.execute("COMMIT")
+                    return replayed
 
                 card_row = conn.execute(
                     "SELECT id, fsrs_state FROM cards WHERE id = ?",
@@ -483,7 +495,7 @@ class SQLiteRepository:
                     (session_id, deck_id, mode, input_mode_default, now),
                 )
                 row = conn.execute(
-                    "SELECT * FROM study_sessions WHERE id = ?",
+                    _SELECT_SESSION_BY_ID,
                     (session_id,),
                 ).fetchone()
                 conn.execute("COMMIT")
@@ -496,7 +508,7 @@ class SQLiteRepository:
     def get_session(self, session_id: str) -> StudySession | None:
         with open_connection(self.db_path) as conn:
             row = conn.execute(
-                "SELECT * FROM study_sessions WHERE id = ?",
+                _SELECT_SESSION_BY_ID,
                 (session_id,),
             ).fetchone()
             return _row_to_session(row) if row is not None else None
@@ -524,7 +536,7 @@ class SQLiteRepository:
                         details={"session_id": session_id},
                     )
                 row = conn.execute(
-                    "SELECT * FROM study_sessions WHERE id = ?",
+                    _SELECT_SESSION_BY_ID,
                     (session_id,),
                 ).fetchone()
                 conn.execute("COMMIT")
@@ -546,7 +558,7 @@ class SQLiteRepository:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 row = conn.execute(
-                    "SELECT * FROM study_sessions WHERE id = ?",
+                    _SELECT_SESSION_BY_ID,
                     (session_id,),
                 ).fetchone()
                 if row is None:
@@ -571,7 +583,7 @@ class SQLiteRepository:
                     (now, errors_extracted, summary_notes, session_id),
                 )
                 updated = conn.execute(
-                    "SELECT * FROM study_sessions WHERE id = ?",
+                    _SELECT_SESSION_BY_ID,
                     (session_id,),
                 ).fetchone()
                 conn.execute("COMMIT")

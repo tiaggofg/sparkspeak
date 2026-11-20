@@ -2,7 +2,7 @@
 
 import asyncio
 import wave
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterable
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -91,7 +91,7 @@ def _iter_sounddevice_chunks(
     sample_rate: int,
     blocksize: int,
     channels: int,
-) -> Iterator[npt.NDArray[np.float32]]:
+) -> Generator[npt.NDArray[np.float32], None, None]:
     """Yield mono float32 PCM chunks from PipeWire default input via sounddevice."""
     try:
         sd = _import_sounddevice()

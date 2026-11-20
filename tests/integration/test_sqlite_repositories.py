@@ -13,9 +13,11 @@ from sparkspeak.infrastructure.db.connection import open_connection
 from sparkspeak.infrastructure.db.migrator import run_migrations
 from sparkspeak.infrastructure.db.repositories import SQLiteRepository
 
+_DB_FILENAME = "sparkspeak.db"
+
 
 def _setup_repo(tmp_path: Path) -> SQLiteRepository:
-    db_path = tmp_path / "sparkspeak.db"
+    db_path = tmp_path / _DB_FILENAME
     backups_dir = tmp_path / "backups"
     run_migrations(db_path=db_path, backups_dir=backups_dir)
     return SQLiteRepository(db_path=db_path)
@@ -97,7 +99,7 @@ def test_submit_review_updates_fsrs_and_logs(tmp_path: Path) -> None:
     assert updated_card.difficulty == pytest.approx(scheduled.difficulty)
     assert updated_card.fsrs_state == scheduled.fsrs_state_int
 
-    with open_connection(tmp_path / "sparkspeak.db") as conn:
+    with open_connection(tmp_path / _DB_FILENAME) as conn:
         log_rows = conn.execute(
             "SELECT card_id, session_id, rating, fsrs_state_after, scheduled_days "
             "FROM review_logs WHERE card_id = ?",
@@ -126,7 +128,7 @@ def test_submit_review_updates_fsrs_and_logs(tmp_path: Path) -> None:
     assert replayed.idempotent_replay is True
     assert repo.get_card_by_id(card.id).reps == 1  # type: ignore[union-attr]
     assert repo.get_session(session.id).cards_reviewed == 1  # type: ignore[union-attr]
-    with open_connection(tmp_path / "sparkspeak.db") as conn:
+    with open_connection(tmp_path / _DB_FILENAME) as conn:
         count = conn.execute(
             "SELECT COUNT(*) FROM review_logs WHERE card_id = ?", (card.id,)
         ).fetchone()[0]
@@ -173,7 +175,7 @@ def test_submit_review_invalid_rating_and_unknown_card_leave_db_unchanged(
     assert unchanged_session is not None
     assert unchanged_session.cards_reviewed == 0
 
-    with open_connection(tmp_path / "sparkspeak.db") as conn:
+    with open_connection(tmp_path / _DB_FILENAME) as conn:
         log_count = conn.execute("SELECT COUNT(*) FROM review_logs").fetchone()[0]
     assert log_count == 0
 

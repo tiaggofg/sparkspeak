@@ -24,6 +24,25 @@ def _import_sounddevice() -> Any:
     return sd
 
 
+def _probe_direction(
+    sd: Any,
+    devices: Any,
+    kind: str,
+    channel_key: str,
+) -> tuple[bool, str | None]:
+    try:
+        default_dev = sd.query_devices(kind=kind)
+        if isinstance(default_dev, dict) and int(default_dev.get(channel_key, 0)) > 0:
+            return True, str(default_dev.get("name", ""))
+    except Exception:  # noqa: BLE001
+        pass
+
+    for dev in devices:
+        if isinstance(dev, dict) and int(dev.get(channel_key, 0)) > 0:
+            return True, str(dev.get("name", ""))
+    return False, None
+
+
 def probe_pipewire_devices() -> DeviceProbeResult:
     """Probe default PipeWire/PortAudio input and output availability safely."""
     try:
@@ -32,37 +51,8 @@ def probe_pipewire_devices() -> DeviceProbeResult:
     except Exception as exc:  # noqa: BLE001
         return DeviceProbeResult(has_input=False, has_output=False, error=str(exc))
 
-    has_input = False
-    has_output = False
-    in_name: str | None = None
-    out_name: str | None = None
-
-    try:
-        default_in = sd.query_devices(kind="input")
-        if isinstance(default_in, dict) and int(default_in.get("max_input_channels", 0)) > 0:
-            has_input = True
-            in_name = str(default_in.get("name", ""))
-    except Exception:  # noqa: BLE001
-        pass
-
-    try:
-        default_out = sd.query_devices(kind="output")
-        if isinstance(default_out, dict) and int(default_out.get("max_output_channels", 0)) > 0:
-            has_output = True
-            out_name = str(default_out.get("name", ""))
-    except Exception:  # noqa: BLE001
-        pass
-
-    if not has_input or not has_output:
-        for dev in devices:
-            if not isinstance(dev, dict):
-                continue
-            if not has_input and int(dev.get("max_input_channels", 0)) > 0:
-                has_input = True
-                in_name = str(dev.get("name", ""))
-            if not has_output and int(dev.get("max_output_channels", 0)) > 0:
-                has_output = True
-                out_name = str(dev.get("name", ""))
+    has_input, in_name = _probe_direction(sd, devices, "input", "max_input_channels")
+    has_output, out_name = _probe_direction(sd, devices, "output", "max_output_channels")
 
     return DeviceProbeResult(
         has_input=has_input,
