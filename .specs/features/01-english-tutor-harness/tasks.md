@@ -124,10 +124,10 @@ T16 → T17 → T18 → T19 → T20
 
 **Done when**:
 
-- [ ] Computes next `due_at`, `stability`, `difficulty`, `fsrs_state`, `scheduled_days` deterministically for ratings 1-4
-- [ ] Rejects ratings outside `{1, 2, 3, 4}` with `INVALID_RATING` error
-- [ ] Unit tests in `tests/unit/test_srs_engine.py` pass (6+ tests covering New/Learning/Review/Relearning & invalid ratings)
-- [ ] Gate check passes: `uv run pytest tests/unit -v`
+- [x] Computes next `due_at`, `stability`, `difficulty`, `fsrs_state`, `scheduled_days` deterministically for ratings 1-4
+- [x] Rejects ratings outside `{1, 2, 3, 4}` with `INVALID_RATING` error
+- [x] Unit tests in `tests/unit/test_srs_engine.py` pass (6+ tests covering New/Learning/Review/Relearning & invalid ratings)
+- [x] Gate check passes: `uv run pytest tests/unit -v`
 
 **Tests**: unit
 **Gate**: quick
