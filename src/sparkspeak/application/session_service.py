@@ -41,7 +41,8 @@ class StartSessionResult:
     deck: Deck | None
     mode: SessionMode
     effective_input_mode: InputMode
-    audio_status: dict[str, bool]
+    mic_available: bool
+    tts_available: bool
     due_reviews: int
     new_cards: int
 
@@ -51,6 +52,16 @@ class LogTurnResult:
     session_id: str
     turn_index: int
     errors: list[ErrorLogRecord]
+
+
+@dataclass(frozen=True, slots=True)
+class LogMistakeResult:
+    session_id: str
+    turn_index: int
+    error_id: int
+    category: ErrorCategory
+    occurrence_count: int
+    promoted_card_id: int | None
 
 
 class SessionService:
@@ -65,7 +76,8 @@ class SessionService:
         deck_slug: str | None = None,
         mode: SessionMode = "mixed",
         input_mode: InputMode = "voice",
-        audio_status: dict[str, bool] | None = None,
+        mic_available: bool = False,
+        tts_available: bool = False,
     ) -> StartSessionResult:
         if mode not in ("active_review", "roleplay", "mixed"):
             raise SparkSpeakError(
@@ -90,12 +102,6 @@ class SessionService:
                     details={"deck_slug": deck_slug},
                 )
 
-        default_audio = audio_status or {
-            "tts_ready": False,
-            "stt_ready": False,
-            "pipewire_input": False,
-            "pipewire_output": False,
-        }
         session = self._repo.create_session(
             mode=mode,
             input_mode_default=input_mode,
@@ -108,9 +114,49 @@ class SessionService:
             deck=deck,
             mode=mode,
             effective_input_mode=input_mode,
-            audio_status=default_audio,
+            mic_available=mic_available,
+            tts_available=tts_available,
             due_reviews=due_reviews,
             new_cards=new_cards,
+        )
+
+    def log_mistake(
+        self,
+        *,
+        session_id: str,
+        utterance_raw: str,
+        correction: str,
+        category: ErrorCategory = "grammar",
+        explanation: str = "",
+        deck_slug: str | None = None,
+        input_mode: InputMode = "voice",
+        audio_duration_ms: int | None = None,
+    ) -> LogMistakeResult:
+        """Record a single learner turn and upsert the mistake into error_logs."""
+        result = self.log_turn_and_errors(
+            session_id=session_id,
+            speaker="user",
+            raw_transcript=utterance_raw,
+            input_mode=input_mode,
+            deck_slug=deck_slug,
+            audio_duration_ms=audio_duration_ms,
+            errors=[
+                ErrorLogInput(
+                    category=category,
+                    utterance_raw=utterance_raw.strip(),
+                    correction=correction.strip(),
+                    explanation=explanation.strip(),
+                )
+            ],
+        )
+        recorded = result.errors[0]
+        return LogMistakeResult(
+            session_id=result.session_id,
+            turn_index=result.turn_index,
+            error_id=recorded.id,
+            category=recorded.category,
+            occurrence_count=recorded.occurrence_count,
+            promoted_card_id=recorded.promoted_card_id,
         )
 
     def switch_input_mode(self, session_id: str, input_mode: InputMode) -> StudySession:

@@ -1,15 +1,14 @@
-"""Application service serializing TTS and STT operations under a single AudioLock."""
+"""Application service serializing microphone WAV capture and TTS playback under AudioLock."""
 
 import asyncio
-from collections.abc import Callable
 
 from sparkspeak.domain.errors import ErrorCode, SparkSpeakError
+from sparkspeak.infrastructure.audio.kokoro_tts import DEFAULT_KOKORO_VOICE
 from sparkspeak.infrastructure.audio.ports import (
-    AudioStatus,
+    RecordUtteranceResult,
     SpeakResult,
-    STTEngine,
-    TranscribeResult,
     TTSEngine,
+    UtteranceRecorder,
 )
 
 MIN_SPEED = 0.75
@@ -35,36 +34,35 @@ def _validate_int_range(value: int, field: str, low: int, high: int) -> None:
 
 
 class AudioService:
-    """Coordinates single-flight audio hardware access via asyncio.Lock."""
+    """Coordinates single-flight microphone WAV capture and TTS playback via asyncio.Lock."""
 
     def __init__(
         self,
         *,
+        recorder: UtteranceRecorder | None = None,
         tts: TTSEngine | None = None,
-        stt: STTEngine | None = None,
-        device_probe: Callable[[], AudioStatus] | None = None,
     ) -> None:
+        self._recorder = recorder
         self._tts = tts
-        self._stt = stt
-        self._device_probe = device_probe
         self._lock = asyncio.Lock()
 
-    def get_audio_status(self) -> AudioStatus:
-        """Return current readiness of TTS, STT, and PipeWire input/output."""
-        if self._device_probe is not None:
-            return self._device_probe()
-        return AudioStatus(
-            tts_ready=self._tts.is_ready() if self._tts is not None else False,
-            stt_ready=self._stt.is_ready() if self._stt is not None else False,
-            pipewire_input=self._stt is not None,
-            pipewire_output=self._tts is not None,
-        )
+    def is_mic_available(self) -> bool:
+        """Return True if a microphone input source is available."""
+        if self._recorder is None:
+            return False
+        return self._recorder.is_mic_available()
+
+    def is_tts_available(self) -> bool:
+        """Return True if the local TTS engine and models are ready."""
+        if self._tts is None:
+            return False
+        return self._tts.is_ready()
 
     async def speak_text(
         self,
         text: str,
         *,
-        voice: str = "en_US-lessac-medium",
+        voice: str = DEFAULT_KOKORO_VOICE,
         speed: float = 1.0,
         blocking: bool = True,
     ) -> SpeakResult:
@@ -97,12 +95,10 @@ class AudioService:
         if self._tts is None:
             raise SparkSpeakError(
                 error_code=ErrorCode.TTS_MODEL_MISSING,
-                message="TTS engine is not configured; run `uv run sparkspeak-setup-models`.",
+                message="TTS engine is not configured.",
                 recoverable=True,
                 fallback_hint="text",
-                details={"setup_command": "uv run sparkspeak-setup-models"},
             )
-
         async with self._lock:
             return await self._tts.speak(
                 stripped,
@@ -111,14 +107,14 @@ class AudioService:
                 blocking=blocking,
             )
 
-    async def listen_and_transcribe(
+    async def record_utterance(
         self,
         *,
         silence_timeout_ms: int = 1500,
         initial_speech_timeout_ms: int = 10000,
         max_duration_ms: int = 45000,
-    ) -> TranscribeResult:
-        """Capture and transcribe speech under AudioLock."""
+    ) -> RecordUtteranceResult:
+        """Validate timeout bounds and record an utterance under AudioLock."""
         _validate_int_range(
             silence_timeout_ms,
             "silence_timeout_ms",
@@ -137,15 +133,15 @@ class AudioService:
             MIN_MAX_DURATION_MS,
             MAX_MAX_DURATION_MS,
         )
-        if self._stt is None:
+        if self._recorder is None:
             raise SparkSpeakError(
                 error_code=ErrorCode.MICROPHONE_UNAVAILABLE,
-                message="STT engine is not configured or microphone is unavailable.",
+                message="Microphone recorder is not configured or unavailable.",
                 recoverable=True,
                 fallback_hint="text",
             )
         async with self._lock:
-            return await self._stt.listen_and_transcribe(
+            return await self._recorder.record_utterance(
                 silence_timeout_ms=silence_timeout_ms,
                 initial_speech_timeout_ms=initial_speech_timeout_ms,
                 max_duration_ms=max_duration_ms,

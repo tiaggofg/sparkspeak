@@ -16,6 +16,7 @@ def test_default_config_resolves_dot_data_paths(
 ) -> None:
     monkeypatch.delenv("SPARKSPEAK_DB_PATH", raising=False)
     monkeypatch.delenv("SPARKSPEAK_BACKUPS_DIR", raising=False)
+    monkeypatch.delenv("SPARKSPEAK_AUDIO_DIR", raising=False)
     monkeypatch.delenv("SPARKSPEAK_MODELS_DIR", raising=False)
 
     cfg = load_config(project_root=tmp_path)
@@ -23,6 +24,7 @@ def test_default_config_resolves_dot_data_paths(
     assert isinstance(cfg, SparkSpeakConfig)
     assert cfg.db_path == tmp_path / _DATA_DIR / "sparkspeak.db"
     assert cfg.backups_dir == tmp_path / _DATA_DIR / "backups"
+    assert cfg.audio_dir == tmp_path / _DATA_DIR / "audio"
     assert cfg.models_dir == tmp_path / _DATA_DIR / "models"
 
 
@@ -31,16 +33,33 @@ def test_config_honors_sparkspeak_env_overrides(
 ) -> None:
     custom_db = tmp_path / "custom" / "tutor.db"
     custom_backups = tmp_path / "custom_backups"
+    custom_audio = tmp_path / "custom_audio"
     custom_models = tmp_path / "custom_models"
     monkeypatch.setenv("SPARKSPEAK_DB_PATH", str(custom_db))
     monkeypatch.setenv("SPARKSPEAK_BACKUPS_DIR", str(custom_backups))
+    monkeypatch.setenv("SPARKSPEAK_AUDIO_DIR", str(custom_audio))
     monkeypatch.setenv("SPARKSPEAK_MODELS_DIR", str(custom_models))
 
     cfg = load_config(project_root=tmp_path)
 
     assert cfg.db_path == custom_db
     assert cfg.backups_dir == custom_backups
+    assert cfg.audio_dir == custom_audio
     assert cfg.models_dir == custom_models
+
+
+def test_error_code_enum_contains_expected_codes() -> None:
+    expected = {
+        "INVALID_ARGUMENT",
+        "INVALID_RATING",
+        "CARD_NOT_FOUND",
+        "DECK_NOT_FOUND",
+        "SESSION_NOT_FOUND",
+        "MICROPHONE_UNAVAILABLE",
+        "TTS_MODEL_MISSING",
+        "AUDIO_OUTPUT_UNAVAILABLE",
+    }
+    assert {code.value for code in ErrorCode} == expected
 
 
 def test_structured_error_envelope_serializes_required_fields() -> None:

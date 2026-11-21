@@ -17,16 +17,18 @@ classDiagram
   }
 
   class SessionService {
-    +start_session(deck_slug, mode, input_mode) StartSessionResult
+    +start_session(deck_slug, mode, input_mode, mic_available) StartSessionResult
     +switch_input_mode(session_id, input_mode) StudySession
+    +log_mistake(session_id, utterance_raw, correction, category, explanation) LogMistakeResult
     +log_turn_and_errors(session_id, speaker, raw_transcript, input_mode, errors) LogTurnResult
     +end_session(session_id, promote_errors, summary_notes) SessionSummary
   }
 
   class AudioService {
-    +get_audio_status() AudioStatus
+    +is_mic_available() bool
+    +is_tts_available() bool
     +speak_text(text, voice, speed, blocking) SpeakResult
-    +listen_and_transcribe(silence_timeout_ms, initial_speech_timeout_ms, max_duration_ms) TranscribeResult
+    +record_utterance(silence_timeout_ms, initial_speech_timeout_ms, max_duration_ms) RecordUtteranceResult
   }
 
   ReviewService --> SRSEngine

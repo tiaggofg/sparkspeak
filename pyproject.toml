@@ -1,21 +1,18 @@
 [project]
 name = "sparkspeak"
-version = "0.1.0"
-description = "Local-first English tutor MCP harness with FSRS spaced repetition and offline PipeWire audio"
+version = "0.2.0"
+description = "Local-first English tutor MCP harness with FSRS spaced repetition and lightweight WAV audio capture"
 requires-python = ">=3.12"
 dependencies = [
     "mcp>=1.0.0",
     "fsrs>=4.0.0",
-    "faster-whisper>=1.1.0",
-    "piper-tts>=1.2.0",
+    "kokoro-onnx>=0.4.0",
     "sounddevice>=0.5.0",
     "numpy>=1.26.0",
 ]
 
 [project.scripts]
 sparkspeak-mcp = "sparkspeak.mcp.server:main"
-sparkspeak-setup-models = "sparkspeak.cli.setup_models:main"
-sparkspeak-health = "sparkspeak.cli.setup_models:health"
 
 [dependency-groups]
 dev = [

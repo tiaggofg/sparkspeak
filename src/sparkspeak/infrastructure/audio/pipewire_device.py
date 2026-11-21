@@ -11,6 +11,8 @@ from sparkspeak.domain.errors import ErrorCode, SparkSpeakError
 
 @dataclass(frozen=True, slots=True)
 class DeviceProbeResult:
+    """Result of probing PipeWire/PortAudio input and output availability."""
+
     has_input: bool
     has_output: bool
     input_device_name: str | None = None
@@ -53,13 +55,17 @@ def probe_pipewire_devices() -> DeviceProbeResult:
 
     has_input, in_name = _probe_direction(sd, devices, "input", "max_input_channels")
     has_output, out_name = _probe_direction(sd, devices, "output", "max_output_channels")
-
     return DeviceProbeResult(
         has_input=has_input,
         has_output=has_output,
         input_device_name=in_name,
         output_device_name=out_name,
     )
+
+
+def has_input_device() -> bool:
+    """Return True if a PipeWire/PortAudio microphone input source is available."""
+    return probe_pipewire_devices().has_input
 
 
 def has_output_device() -> bool:

@@ -31,13 +31,12 @@ from sparkspeak.domain.models import (  # noqa: E402
     SourceType,
     Speaker,
 )
-from sparkspeak.infrastructure.audio.piper_tts import (  # noqa: E402
-    DEFAULT_PIPER_VOICE,
-    PiperTTSAdapter,
+from sparkspeak.infrastructure.audio.kokoro_tts import (  # noqa: E402
+    DEFAULT_KOKORO_VOICE,
+    KokoroTTSAdapter,
 )
-from sparkspeak.infrastructure.audio.pipewire_device import probe_pipewire_devices  # noqa: E402
-from sparkspeak.infrastructure.audio.ports import AudioStatus, STTEngine  # noqa: E402
-from sparkspeak.infrastructure.audio.whisper_stt import WhisperSTTAdapter  # noqa: E402
+from sparkspeak.infrastructure.audio.ports import TTSEngine, UtteranceRecorder  # noqa: E402
+from sparkspeak.infrastructure.audio.wav_recorder import WavRecorder  # noqa: E402
 from sparkspeak.infrastructure.db.migrator import run_migrations  # noqa: E402
 from sparkspeak.infrastructure.db.repositories import SQLiteRepository  # noqa: E402
 
@@ -61,7 +60,8 @@ def _error_result(err: SparkSpeakError) -> types.CallToolResult:
 def create_server(
     config: SparkSpeakConfig | None = None,
     *,
-    stt_adapter: STTEngine | None = None,
+    recorder: UtteranceRecorder | None = None,
+    tts_adapter: TTSEngine | None = None,
 ) -> MCPServer:
     """Create and configure the SparkSpeak MCPServer with SQLite migrations."""
     cfg = config or load_config()
@@ -70,23 +70,9 @@ def create_server(
     repo = SQLiteRepository(cfg.db_path)
     review_service = ReviewService(repo)
     session_service = SessionService(repo)
-    tts_adapter = PiperTTSAdapter(cfg.models_dir)
-    stt = stt_adapter or WhisperSTTAdapter(cfg.models_dir)
-
-    def _probe_audio_status() -> AudioStatus:
-        probe = probe_pipewire_devices()
-        return AudioStatus(
-            tts_ready=tts_adapter.is_ready(),
-            stt_ready=stt.is_ready(),
-            pipewire_input=probe.has_input,
-            pipewire_output=probe.has_output,
-        )
-
-    audio_service = AudioService(
-        tts=tts_adapter,
-        stt=stt,
-        device_probe=_probe_audio_status,
-    )
+    utterance_recorder: UtteranceRecorder = recorder or WavRecorder(cfg.audio_dir)
+    tts_engine: TTSEngine = tts_adapter or KokoroTTSAdapter(cfg.models_dir)
+    audio_service = AudioService(recorder=utterance_recorder, tts=tts_engine)
 
     server = MCPServer("sparkspeak")
     _register_session_tools(server, session_service, audio_service)
@@ -101,11 +87,10 @@ def _register_session_tools(
     session_service: SessionService,
     audio_service: AudioService,
 ) -> None:
-
     @server.tool(
         description=(
             "Initialize an English study session in SQLite and report due queue counts "
-            "and audio subsystem readiness."
+            "and microphone availability."
         )
     )
     def start_session(
@@ -114,12 +99,14 @@ def _register_session_tools(
         input_mode: str = "voice",
     ) -> types.CallToolResult:
         try:
-            audio_status = audio_service.get_audio_status().to_dict()
+            mic_available = audio_service.is_mic_available()
+            tts_available = audio_service.is_tts_available()
             res = session_service.start_session(
                 deck_slug=deck_slug,
                 mode=cast(SessionMode, mode),
                 input_mode=cast(InputMode, input_mode),
-                audio_status=audio_status,
+                mic_available=mic_available,
+                tts_available=tts_available,
             )
             deck_payload = (
                 {
@@ -137,7 +124,8 @@ def _register_session_tools(
                     "deck": deck_payload,
                     "mode": res.mode,
                     "effective_input_mode": res.effective_input_mode,
-                    "audio_status": res.audio_status,
+                    "mic_available": res.mic_available,
+                    "tts_available": res.tts_available,
                     "due_summary": {
                         "due_reviews": res.due_reviews,
                         "new_cards": res.new_cards,
@@ -146,6 +134,7 @@ def _register_session_tools(
             )
         except SparkSpeakError as err:
             return _error_result(err)
+
 
 def _register_review_tools(server: MCPServer, review_service: ReviewService) -> None:
     @server.tool(
@@ -156,8 +145,8 @@ def _register_review_tools(server: MCPServer, review_service: ReviewService) -> 
     )
     def get_due_cards(
         deck_slug: str | None = None,
-        limit: int = 10,
-        new_cards_limit: int = 3,
+        limit: int = 5,
+        new_cards_limit: int = 2,
         include_new: bool = True,
     ) -> types.CallToolResult:
         try:
@@ -178,9 +167,6 @@ def _register_review_tools(server: MCPServer, review_service: ReviewService) -> 
                             "context_example": c.context_example,
                             "card_type": c.card_type,
                             "is_new": c.is_new,
-                            "fsrs_state": c.fsrs_state,
-                            "reps": c.reps,
-                            "lapses": c.lapses,
                             "due_at": c.due_at,
                         }
                         for c in res.cards
@@ -205,7 +191,7 @@ def _register_review_tools(server: MCPServer, review_service: ReviewService) -> 
         card_id: int,
         rating: int,
         user_response_raw: str,
-        input_mode: str,
+        input_mode: str = "voice",
         session_id: str | None = None,
         duration_ms: int | None = None,
         idempotency_key: str | None = None,
@@ -227,8 +213,6 @@ def _register_review_tools(server: MCPServer, review_service: ReviewService) -> 
                     "fsrs_state": res.fsrs_state,
                     "scheduled_days": res.scheduled_days,
                     "next_due_at": res.next_due_at,
-                    "stability": res.stability,
-                    "difficulty": res.difficulty,
                     "idempotent_replay": res.idempotent_replay,
                 }
             )
@@ -269,10 +253,51 @@ def _register_review_tools(server: MCPServer, review_service: ReviewService) -> 
         except SparkSpeakError as err:
             return _error_result(err)
 
+
 def _register_session_tools_tail(
     server: MCPServer,
     session_service: SessionService,
 ) -> None:
+    @server.tool(
+        description=(
+            "Log a single learner mistake (pronunciation, grammar, vocabulary, phrasal_verb, "
+            "or register) with SHA-256 fingerprint deduplication."
+        )
+    )
+    def log_mistake(
+        session_id: str,
+        utterance_raw: str,
+        correction: str,
+        category: str = "grammar",
+        explanation: str = "",
+        deck_slug: str | None = None,
+        input_mode: str = "voice",
+        audio_duration_ms: int | None = None,
+    ) -> types.CallToolResult:
+        try:
+            res = session_service.log_mistake(
+                session_id=session_id,
+                utterance_raw=utterance_raw,
+                correction=correction,
+                category=cast(ErrorCategory, category),
+                explanation=explanation,
+                deck_slug=deck_slug,
+                input_mode=cast(InputMode, input_mode),
+                audio_duration_ms=audio_duration_ms,
+            )
+            return _ok_result(
+                {
+                    "session_id": res.session_id,
+                    "turn_index": res.turn_index,
+                    "error_id": res.error_id,
+                    "category": res.category,
+                    "occurrence_count": res.occurrence_count,
+                    "promoted_card_id": res.promoted_card_id,
+                }
+            )
+        except SparkSpeakError as err:
+            return _error_result(err)
+
     @server.tool(
         description=(
             "Record a conversation turn and upsert detected learner errors into "
@@ -385,16 +410,17 @@ def _register_session_tools_tail(
         except SparkSpeakError as err:
             return _error_result(err)
 
+
 def _register_audio_tools(server: MCPServer, audio_service: AudioService) -> None:
     @server.tool(
         description=(
-            "Synthesize English speech via local Piper ONNX and play PCM audio to "
-            "the default PipeWire output sink."
+            "Synthesize natural English speech offline via Kokoro ONNX and play audio "
+            "to PipeWire output. Curated voices: af_heart (default), af_jessica, am_liam, am_puck."
         )
     )
     async def speak_text(
         text: str,
-        voice: str = DEFAULT_PIPER_VOICE,
+        voice: str = DEFAULT_KOKORO_VOICE,
         speed: float = 1.0,
         blocking: bool = True,
     ) -> types.CallToolResult:
@@ -405,58 +431,34 @@ def _register_audio_tools(server: MCPServer, audio_service: AudioService) -> Non
                 speed=speed,
                 blocking=blocking,
             )
-            return _ok_result(
-                {
-                    "spoken": res.spoken,
-                    "voice": res.voice,
-                    "duration_ms": res.duration_ms,
-                }
-            )
+            return _ok_result(res.to_dict())
         except SparkSpeakError as err:
             return _error_result(err)
 
     @server.tool(
         description=(
-            "Record 16kHz mono PCM from PipeWire with Silero VAD endpointing and "
-            "return a verbatim faster-whisper transcript without grammar auto-correction."
+            "Record 16 kHz mono 16-bit PCM speech from PipeWire using RMS silence endpointing "
+            "and save to .data/audio/last_utterance.wav for multimodal read_file listening."
         )
     )
-    async def listen_and_transcribe(
+    async def record_utterance(
         silence_timeout_ms: int = 1500,
         initial_speech_timeout_ms: int = 10000,
         max_duration_ms: int = 45000,
     ) -> types.CallToolResult:
         try:
-            res = await audio_service.listen_and_transcribe(
+            res = await audio_service.record_utterance(
                 silence_timeout_ms=silence_timeout_ms,
                 initial_speech_timeout_ms=initial_speech_timeout_ms,
                 max_duration_ms=max_duration_ms,
             )
-            return _ok_result(
-                {
-                    "speech_detected": res.speech_detected,
-                    "transcript": res.transcript,
-                    "duration_ms": res.duration_ms,
-                    "truncated_at_max_duration": res.truncated_at_max_duration,
-                    "avg_logprob": res.avg_logprob,
-                    "no_speech_prob": res.no_speech_prob,
-                }
-            )
+            return _ok_result(res.to_dict())
         except SparkSpeakError as err:
             return _error_result(err)
 
-    @server.tool(
-        description=(
-            "Report local TTS/STT model readiness and PipeWire input/output device availability."
-        )
-    )
-    def get_audio_status() -> types.CallToolResult:
-        return _ok_result(audio_service.get_audio_status().to_dict())
-
 
 def main() -> None:
-    """Run the SparkSpeak MCP server over stdio."""
-    logger.info("Starting SparkSpeak MCP stdio server")
+    """Entrypoint for `sparkspeak-mcp` stdio server."""
     server = create_server()
     server.run(transport="stdio")
 

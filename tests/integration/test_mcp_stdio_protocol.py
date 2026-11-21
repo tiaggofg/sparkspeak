@@ -16,11 +16,11 @@ from mcp.client.stdio import stdio_client
 def _server_params(tmp_path: Path) -> StdioServerParameters:
     db_path = tmp_path / "test_sparkspeak.db"
     backups_dir = tmp_path / "backups"
-    models_dir = tmp_path / "models"
+    audio_dir = tmp_path / "audio"
     env = os.environ.copy()
     env["SPARKSPEAK_DB_PATH"] = str(db_path)
     env["SPARKSPEAK_BACKUPS_DIR"] = str(backups_dir)
-    env["SPARKSPEAK_MODELS_DIR"] = str(models_dir)
+    env["SPARKSPEAK_AUDIO_DIR"] = str(audio_dir)
     return StdioServerParameters(
         command=sys.executable,
         args=["-m", "sparkspeak.mcp.server"],
@@ -35,8 +35,37 @@ def _parse_tool_json(result: Any) -> dict[str, Any]:
     return parsed
 
 
+def test_list_tools_exposes_lean_multimodal_contract(tmp_path: Path) -> None:
+    """C2: list_tools exposes the 9 hybrid multimodal+Kokoro tools and zero Whisper/Piper tools."""
+
+    async def _run() -> None:
+        params = _server_params(tmp_path)
+        async with (
+            stdio_client(params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
+            tools = await session.list_tools()
+            names = {t.name for t in tools.tools}
+            assert names == {
+                "start_session",
+                "get_due_cards",
+                "submit_review",
+                "add_card",
+                "log_mistake",
+                "log_turn_and_errors",
+                "end_session",
+                "record_utterance",
+                "speak_text",
+            }
+            assert "listen_and_transcribe" not in names
+            assert "get_audio_status" not in names
+
+    asyncio.run(_run())
+
+
 def test_start_session_persists_active_row(tmp_path: Path) -> None:
-    """C1: start_session persists an active study_sessions row in SQLite."""
+    """C5: start_session persists an active study_sessions row with mic_available."""
 
     async def _run() -> None:
         params = _server_params(tmp_path)
@@ -55,6 +84,9 @@ def test_start_session_persists_active_row(tmp_path: Path) -> None:
             assert payload["deck"]["slug"] == "phrasal-verbs"
             assert payload["mode"] == "active_review"
             assert payload["effective_input_mode"] == "text"
+            assert isinstance(payload["mic_available"], bool)
+            assert isinstance(payload["tts_available"], bool)
+            assert "audio_status" not in payload
             assert payload["due_summary"]["new_cards"] > 0
 
             conn = sqlite3.connect(tmp_path / "test_sparkspeak.db")
@@ -100,7 +132,10 @@ def test_text_mode_never_invokes_audio(tmp_path: Path) -> None:
                 assert not due_res.is_error
                 due_data = _parse_tool_json(due_res)
                 assert len(due_data["cards"]) >= 1
-                card_id = due_data["cards"][0]["card_id"]
+                first_card = due_data["cards"][0]
+                assert "fsrs_state" not in first_card
+                assert "reps" not in first_card
+                card_id = first_card["card_id"]
 
                 rev_res = await session.call_tool(
                     "submit_review",
@@ -117,19 +152,23 @@ def test_text_mode_never_invokes_audio(tmp_path: Path) -> None:
                 assert rev_data["card_id"] == card_id
                 assert rev_data["rating"] == 3
                 assert rev_data["next_due_at"]
+                assert "stability" not in rev_data
+                assert "difficulty" not in rev_data
 
                 if mode == "roleplay":
-                    turn_res = await session.call_tool(
-                        "log_turn_and_errors",
+                    mistake_res = await session.call_tool(
+                        "log_mistake",
                         {
                             "session_id": session_id,
-                            "speaker": "user",
-                            "raw_transcript": "How have you been lately?",
+                            "utterance_raw": "How you been lately?",
+                            "correction": "How have you been lately?",
+                            "category": "grammar",
                             "input_mode": "text",
-                            "errors": [],
                         },
                     )
-                    assert not turn_res.is_error
+                    assert not mistake_res.is_error
+                    mistake_data = _parse_tool_json(mistake_res)
+                    assert mistake_data["occurrence_count"] == 1
 
                 end_res = await session.call_tool(
                     "end_session",
@@ -236,7 +275,7 @@ def test_structured_error_envelope_and_stdout_hygiene(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["SPARKSPEAK_DB_PATH"] = str(tmp_path / "hygiene.db")
     env["SPARKSPEAK_BACKUPS_DIR"] = str(tmp_path / "backups")
-    env["SPARKSPEAK_MODELS_DIR"] = str(tmp_path / "models")
+    env["SPARKSPEAK_AUDIO_DIR"] = str(tmp_path / "audio")
     init_req = (
         json.dumps(
             {

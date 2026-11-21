@@ -1,44 +1,63 @@
-"""Audio port protocols and result DTOs for TTS and STT adapters."""
+"""Audio port protocols and result DTOs for WAV capture and Kokoro TTS output."""
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
+
+
+@dataclass(frozen=True, slots=True)
+class RecordUtteranceResult:
+    """Result of capturing a learner utterance into a 16 kHz mono WAV file."""
+
+    speech_detected: bool
+    wav_path: str | None
+    duration_ms: int
+    peak_rms: float
+    truncated_at_max_duration: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize result for MCP JSON tool responses."""
+        return {
+            "speech_detected": self.speech_detected,
+            "wav_path": self.wav_path,
+            "duration_ms": self.duration_ms,
+            "peak_rms": self.peak_rms,
+            "truncated_at_max_duration": self.truncated_at_max_duration,
+        }
 
 
 @dataclass(frozen=True, slots=True)
 class SpeakResult:
+    """Result of synthesizing and playing a tutor utterance."""
+
     spoken: bool
     voice: str
     duration_ms: int
 
-
-@dataclass(frozen=True, slots=True)
-class TranscribeResult:
-    speech_detected: bool
-    transcript: str
-    duration_ms: int
-    truncated_at_max_duration: bool = False
-    avg_logprob: float | None = None
-    no_speech_prob: float | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class AudioStatus:
-    tts_ready: bool
-    stt_ready: bool
-    pipewire_input: bool
-    pipewire_output: bool
-
-    def to_dict(self) -> dict[str, bool]:
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize result for MCP JSON tool responses."""
         return {
-            "tts_ready": self.tts_ready,
-            "stt_ready": self.stt_ready,
-            "pipewire_input": self.pipewire_input,
-            "pipewire_output": self.pipewire_output,
+            "spoken": self.spoken,
+            "voice": self.voice,
+            "duration_ms": self.duration_ms,
         }
 
 
+class UtteranceRecorder(Protocol):
+    """Port for RMS-gated microphone capture into a WAV file."""
+
+    def is_mic_available(self) -> bool: ...
+
+    async def record_utterance(
+        self,
+        *,
+        silence_timeout_ms: int = 1500,
+        initial_speech_timeout_ms: int = 10000,
+        max_duration_ms: int = 45000,
+    ) -> RecordUtteranceResult: ...
+
+
 class TTSEngine(Protocol):
-    """Port for local text-to-speech synthesis and playback."""
+    """Port for local neural text-to-speech synthesis and playback."""
 
     def is_ready(self) -> bool: ...
 
@@ -46,21 +65,7 @@ class TTSEngine(Protocol):
         self,
         text: str,
         *,
-        voice: str = "en_US-lessac-medium",
+        voice: str = "af_heart",
         speed: float = 1.0,
         blocking: bool = True,
     ) -> SpeakResult: ...
-
-
-class STTEngine(Protocol):
-    """Port for VAD-gated microphone capture and raw transcription."""
-
-    def is_ready(self) -> bool: ...
-
-    async def listen_and_transcribe(
-        self,
-        *,
-        silence_timeout_ms: int = 1500,
-        initial_speech_timeout_ms: int = 10000,
-        max_duration_ms: int = 45000,
-    ) -> TranscribeResult: ...

@@ -32,7 +32,7 @@
 - **Trade-off**: Exige download prévio dos pesos via `sparkspeak-setup-models`; ver `docs/adr/0004-offline-pipewire-audio-pipeline.md`.
 - **Scope**: `src/sparkspeak/infrastructure/audio/`, `src/sparkspeak/application/audio_service.py`
 - **Date**: 2026-11-20
-- **Status**: active
+- **Status**: superseded by AD-006
 
 ### AD-005
 - **Decision**: Empacotar Skill e servidor MCP como Workspace Plugin do Antigravity em `.agents/plugins/sparkspeak/` (`plugin.json`, `mcp_config.json`, `skills/english-tutor/SKILL.md`).
@@ -42,19 +42,24 @@
 - **Date**: 2026-11-20
 - **Status**: active
 
+### AD-006
+- **Decision**: Substituir `faster-whisper` (STT local) e `piper-tts` (TTS local) por captura ultraleve de `.wav` 16 kHz mono 16-bit PCM com endpointing de silêncio por energia RMS (`record_utterance` -> `.data/audio/last_utterance.wav`), lido diretamente como áudio multimodal (`audio/wav`) pelo Gemini via `read_file` do Antigravity, combinado com **`kokoro-onnx`** (`speak_text`, vozes curadas `af_heart`, `af_jessica`, `am_liam`, `am_puck` em `.data/models/`) para saída de voz natural offline e texto mínimo no chat.
+- **Reason**: Qualquer STT intermediário converte fala em texto e mascara nuances reais de pronúncia (fonemas `/θ/`, terminação `-ed`, vogal epentética, *word stress* e entonação). Ao ler o `.wav` diretamente via `read_file`, o Gemini ouve o áudio bruto real do aluno; e o `kokoro-onnx` fornece saída de voz humana offline no PipeWire sem depender de chaves de API externas.
+- **Trade-off**: Requer `speak_text` -> `record_utterance` -> `read_file(wav_path)` na Skill durante sessões em modo `voice` e os dois arquivos do Kokoro em `.data/models/` (~338 MB).
+- **Scope**: `pyproject.toml`, `src/sparkspeak/infrastructure/audio/`, `src/sparkspeak/application/`, `src/sparkspeak/mcp/server.py`, `.agents/plugins/sparkspeak/skills/english-tutor/SKILL.md`
+- **Date**: 2026-11-20
+- **Status**: active
+
 ## Handoff
 
-- **Feature**: `01-english-tutor-harness`
-- **Phase / Task**: T1–T20 implementadas, verificadas pelo Verifier independente (`c39e952`) e aguardando revisão/aprovação final do usuário para push
+- **Feature**: `02-native-voice-refactoring`
+- **Phase / Task**: Completed (`T1`–`T8` + `kokoro-onnx` hybrid voice output) — Approved by user
 - **Completed**:
-  - `.specs/features/01-english-tutor-harness/spec.md` (Approved)
-  - `.specs/features/01-english-tutor-harness/design.md` (Approved)
-  - `.specs/features/01-english-tutor-harness/tasks.md` (Approved, T1–T20 `[x]`)
-  - `.specs/features/01-english-tutor-harness/proofs.md` (`17 pass, 0 fail` em `c39e952`)
-  - `.specs/features/01-english-tutor-harness/verification.md` (`Verdict: PASS`, 3 findings fechados em `c39e952`)
-  - `docs/adr/0001..0005` + `docs/adr/README.md` + `docs/*.md` + `README.md`
+  - `T1`–`T4`: Removed `faster-whisper`, `piper-tts`, `src/sparkspeak/cli/`, and obsolete tests; implemented `WavRecorder`, `KokoroTTSAdapter` (`af_heart`, `af_jessica`, `am_liam`, `am_puck`), `AudioService`, `audio_dir` + `models_dir` config
+  - `T5`–`T6`: Added `SessionService.log_mistake`, `mic_available`, and `tts_available`; exposed 9 MCP tools (`start_session`, `get_due_cards`, `submit_review`, `add_card`, `log_mistake`, `log_turn_and_errors`, `end_session`, `record_utterance`, `speak_text`)
+  - `T7`–`T8`: Updated `english-tutor` `SKILL.md` + `personas.md` + `error-taxonomy.md`, created `ADR-0006` (superseding `ADR-004`), and synced `README.md` and `docs/*.md`
 - **In-progress** (file:line): none
-- **Next step**: Aguardar aprovação explícita do usuário para `git push` (e instalação opcional de `libportaudio2` + `uv run sparkspeak-setup-models` para áudio PipeWire ao vivo)
-- **Blockers**: Ambiente sem `libportaudio2` / hardware PipeWire e sem pesos baixados em `.data/models/` (testes de áudio executados com mocks e fixture WAV determinístico)
-- **Uncommitted files**: Arquivos iniciais do harness/specs/docs pré-existentes (`.agents/`, `.specs/`, `docs/adr/`, `AGENTS.md`, `sonar-project.properties`, etc.)
+- **Next step**: None (feature committed and pushed)
+- **Blockers**: none
+- **Uncommitted files**: `.specs/features/02-native-voice-refactoring/spec.md`, `.specs/features/02-native-voice-refactoring/tasks.md`, `.specs/STATE.md`
 - **Branch**: main

@@ -1,6 +1,6 @@
 # ADR-0004: Pipeline de Áudio Offline PipeWire (`piper-tts` + Silero VAD + `faster-whisper`)
 
-- **Status**: Accepted
+- **Status**: Superseded by [ADR-0006](./0006-multimodal-wav-input-and-native-voice-output.md)
 - **Date**: 2026-11-20
 - **Scope**: `src/sparkspeak/infrastructure/audio/`, `src/sparkspeak/application/audio_service.py`
 

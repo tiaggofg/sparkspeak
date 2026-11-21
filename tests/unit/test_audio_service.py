@@ -6,66 +6,89 @@ import pytest
 
 from sparkspeak.application.audio_service import AudioService
 from sparkspeak.domain.errors import ErrorCode, SparkSpeakError
-from sparkspeak.infrastructure.audio.ports import AudioStatus, SpeakResult, TranscribeResult
+from sparkspeak.infrastructure.audio.ports import RecordUtteranceResult, SpeakResult
 
 
-class _FakeTTS:
-    def __init__(self, delay_s: float = 0.0, ready: bool = True) -> None:
-        self.delay_s = delay_s
-        self.ready = ready
-        self.events: list[str] = []
-
-    def is_ready(self) -> bool:
-        return self.ready
-
-    async def speak(
+class _FakeRecorder:
+    def __init__(
         self,
-        text: str,
         *,
-        voice: str = "en_US-lessac-medium",
-        speed: float = 1.0,
-        blocking: bool = True,
-    ) -> SpeakResult:
-        self.events.append(f"tts_start:{text}")
-        if self.delay_s > 0:
-            await asyncio.sleep(self.delay_s)
-        self.events.append(f"tts_end:{text}")
-        return SpeakResult(spoken=True, voice=voice, duration_ms=150)
+        available: bool = True,
+        delay_s: float = 0.0,
+        events: list[str] | None = None,
+    ) -> None:
+        self._available = available
+        self._delay_s = delay_s
+        self.events = events if events is not None else []
 
+    def is_mic_available(self) -> bool:
+        return self._available
 
-class _FakeSTT:
-    def __init__(self, events: list[str], delay_s: float = 0.0) -> None:
-        self.events = events
-        self.delay_s = delay_s
-
-    def is_ready(self) -> bool:
-        return True
-
-    async def listen_and_transcribe(
+    async def record_utterance(
         self,
         *,
         silence_timeout_ms: int = 1500,
         initial_speech_timeout_ms: int = 10000,
         max_duration_ms: int = 45000,
-    ) -> TranscribeResult:
-        self.events.append("stt_start")
-        if self.delay_s > 0:
-            await asyncio.sleep(self.delay_s)
-        self.events.append("stt_end")
-        return TranscribeResult(
+    ) -> RecordUtteranceResult:
+        self.events.append(f"rec_start:{silence_timeout_ms}")
+        if self._delay_s > 0:
+            await asyncio.sleep(self._delay_s)
+        self.events.append(f"rec_end:{silence_timeout_ms}")
+        return RecordUtteranceResult(
             speech_detected=True,
-            transcript="hello world",
-            duration_ms=500,
+            wav_path="/tmp/last_utterance.wav",
+            duration_ms=420,
+            peak_rms=0.18,
             truncated_at_max_duration=False,
-            avg_logprob=-0.2,
-            no_speech_prob=0.01,
         )
 
 
-def test_speak_text_rejects_empty_text() -> None:
-    svc = AudioService(tts=_FakeTTS())
+class _FakeTTS:
+    def __init__(
+        self,
+        *,
+        ready: bool = True,
+        delay_s: float = 0.0,
+        events: list[str] | None = None,
+    ) -> None:
+        self._ready = ready
+        self._delay_s = delay_s
+        self.events = events if events is not None else []
+
+    def is_ready(self) -> bool:
+        return self._ready
+
+    async def speak(
+        self,
+        text: str,
+        *,
+        voice: str = "af_heart",
+        speed: float = 1.0,
+        blocking: bool = True,
+    ) -> SpeakResult:
+        self.events.append(f"tts_start:{text}")
+        if self._delay_s > 0:
+            await asyncio.sleep(self._delay_s)
+        self.events.append(f"tts_end:{text}")
+        return SpeakResult(spoken=True, voice=voice, duration_ms=500)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"silence_timeout_ms": 499},
+        {"silence_timeout_ms": 5001},
+        {"initial_speech_timeout_ms": 1999},
+        {"initial_speech_timeout_ms": 30001},
+        {"max_duration_ms": 2999},
+        {"max_duration_ms": 90001},
+    ],
+)
+def test_record_utterance_rejects_out_of_bounds_timeouts(kwargs: dict[str, int]) -> None:
+    svc = AudioService(recorder=_FakeRecorder())
     with pytest.raises(SparkSpeakError) as exc_info:
-        asyncio.run(svc.speak_text("   "))
+        asyncio.run(svc.record_utterance(**kwargs))
     assert exc_info.value.error_code == ErrorCode.INVALID_ARGUMENT
     assert exc_info.value.fallback_hint == "text"
 
@@ -78,50 +101,55 @@ def test_speak_text_rejects_out_of_range_speed(bad_speed: float) -> None:
     assert exc_info.value.error_code == ErrorCode.INVALID_ARGUMENT
 
 
-def test_speak_text_rejects_overlong_text() -> None:
+def test_speak_text_rejects_empty_and_overlong_text() -> None:
     svc = AudioService(tts=_FakeTTS())
-    with pytest.raises(SparkSpeakError) as exc_info:
+    with pytest.raises(SparkSpeakError) as exc_empty:
+        asyncio.run(svc.speak_text("   "))
+    assert exc_empty.value.error_code == ErrorCode.INVALID_ARGUMENT
+
+    with pytest.raises(SparkSpeakError) as exc_long:
         asyncio.run(svc.speak_text("a" * 2001))
-    assert exc_info.value.error_code == ErrorCode.INVALID_ARGUMENT
+    assert exc_long.value.error_code == ErrorCode.INVALID_ARGUMENT
 
 
-def test_concurrent_tts_and_stt_serialize_under_audio_lock() -> None:
-    tts = _FakeTTS(delay_s=0.03)
-    stt = _FakeSTT(events=tts.events, delay_s=0.03)
-    svc = AudioService(tts=tts, stt=stt)
+def test_concurrent_tts_and_record_serialize_under_audio_lock() -> None:
+    events: list[str] = []
+    tts = _FakeTTS(delay_s=0.03, events=events)
+    recorder = _FakeRecorder(delay_s=0.03, events=events)
+    svc = AudioService(recorder=recorder, tts=tts)
 
     async def _run() -> None:
         await asyncio.gather(
             svc.speak_text("First prompt"),
-            svc.listen_and_transcribe(),
+            svc.record_utterance(silence_timeout_ms=600),
         )
 
     asyncio.run(_run())
-    assert tts.events == [
+    assert events == [
         "tts_start:First prompt",
         "tts_end:First prompt",
-        "stt_start",
-        "stt_end",
+        "rec_start:600",
+        "rec_end:600",
     ]
 
 
-def test_missing_tts_engine_raises_recoverable_error() -> None:
-    svc = AudioService(
-        tts=None,
-        stt=None,
-        device_probe=lambda: AudioStatus(
-            tts_ready=False,
-            stt_ready=False,
-            pipewire_input=False,
-            pipewire_output=False,
-        ),
-    )
-    status = svc.get_audio_status()
-    assert status.tts_ready is False
-    assert status.pipewire_output is False
+def test_missing_recorder_and_tts_raise_recoverable_errors() -> None:
+    svc = AudioService(recorder=None, tts=None)
+    assert svc.is_mic_available() is False
+    assert svc.is_tts_available() is False
 
-    with pytest.raises(SparkSpeakError) as exc_info:
+    with pytest.raises(SparkSpeakError) as exc_mic:
+        asyncio.run(svc.record_utterance())
+    assert exc_mic.value.error_code == ErrorCode.MICROPHONE_UNAVAILABLE
+    assert exc_mic.value.fallback_hint == "text"
+
+    with pytest.raises(SparkSpeakError) as exc_tts:
         asyncio.run(svc.speak_text("Hello"))
-    assert exc_info.value.error_code == ErrorCode.TTS_MODEL_MISSING
-    assert exc_info.value.recoverable is True
-    assert exc_info.value.fallback_hint == "text"
+    assert exc_tts.value.error_code == ErrorCode.TTS_MODEL_MISSING
+    assert exc_tts.value.fallback_hint == "text"
+
+
+def test_availability_delegates_to_adapters() -> None:
+    svc = AudioService(recorder=_FakeRecorder(available=True), tts=_FakeTTS(ready=True))
+    assert svc.is_mic_available() is True
+    assert svc.is_tts_available() is True

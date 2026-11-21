@@ -151,3 +151,44 @@ def test_voice_to_text_switch_preserves_session(tmp_path: Path) -> None:
     assert persisted is not None
     assert persisted.input_mode_default == "text"
     assert persisted.cards_reviewed == 1
+
+
+def test_start_session_exposes_mic_available_without_audio_status(tmp_path: Path) -> None:
+    _, session_svc, _ = _make_services(tmp_path)
+    started = session_svc.start_session(
+        deck_slug="tech-meetings",
+        mode="mixed",
+        input_mode="voice",
+        mic_available=True,
+    )
+    assert started.mic_available is True
+    assert not hasattr(started, "audio_status")
+
+
+def test_log_mistake_records_turn_and_deduplicates_fingerprint(tmp_path: Path) -> None:
+    _, session_svc, _ = _make_services(tmp_path)
+    started = session_svc.start_session(deck_slug="tech-meetings", input_mode="voice")
+
+    first = session_svc.log_mistake(
+        session_id=started.session_id,
+        utterance_raw="I work-ed (/wɜːrkɪd/) on the deploy",
+        correction="I worked (/wɜːrkt/) on the deployment",
+        category="pronunciation_asr",
+        explanation="Past tense -ed after /k/ sounds like /t/, not /ɪd/.",
+        audio_duration_ms=2100,
+    )
+    second = session_svc.log_mistake(
+        session_id=started.session_id,
+        utterance_raw="We work-ed on the release",
+        correction="  i worked (/wɜːrkt/) on the deployment ",
+        category="pronunciation_asr",
+    )
+
+    assert first.session_id == started.session_id
+    assert first.turn_index == 1
+    assert first.category == "pronunciation_asr"
+    assert first.occurrence_count == 1
+    assert first.promoted_card_id is None
+    assert second.turn_index == 2
+    assert second.error_id == first.error_id
+    assert second.occurrence_count == 2

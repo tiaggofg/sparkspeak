@@ -31,7 +31,7 @@ def _server_params(tmp_path: Path) -> StdioServerParameters:
     env = os.environ.copy()
     env["SPARKSPEAK_DB_PATH"] = str(tmp_path / "err_log_test.db")
     env["SPARKSPEAK_BACKUPS_DIR"] = str(tmp_path / "backups")
-    env["SPARKSPEAK_MODELS_DIR"] = str(tmp_path / "models")
+    env["SPARKSPEAK_AUDIO_DIR"] = str(tmp_path / "audio")
     return StdioServerParameters(
         command=sys.executable,
         args=["-m", "sparkspeak.mcp.server"],
@@ -220,3 +220,46 @@ def test_mcp_stdio_log_turn_and_errors_roundtrip(tmp_path: Path) -> None:
             assert d2["errors"][0]["occurrence_count"] == 2
 
     asyncio.run(_run())
+
+
+def test_log_mistake_upserts_and_increments_occurrence_count(tmp_path: Path) -> None:
+    """C7: log_mistake deduplicates via SHA-256 fingerprint and end_session promotes it."""
+    svc, _repo, db_path = _setup_service(tmp_path)
+    started = svc.start_session(deck_slug="tech-meetings", mode="roleplay", input_mode="voice")
+
+    first = svc.log_mistake(
+        session_id=started.session_id,
+        utterance_raw="I work-ed (/wɜːrkɪd/) on the deploy",
+        correction="I worked (/wɜːrkt/) on the deployment",
+        category="pronunciation_asr",
+        explanation="Past tense -ed after /k/ sounds like /t/.",
+        audio_duration_ms=2500,
+    )
+    second = svc.log_mistake(
+        session_id=started.session_id,
+        utterance_raw="She work-ed on the hotfix",
+        correction="  i worked (/wɜːrkt/) on the deployment ",
+        category="pronunciation_asr",
+        explanation="Same -ed ending rule.",
+        audio_duration_ms=2100,
+    )
+
+    assert first.turn_index == 1
+    assert first.occurrence_count == 1
+    assert second.turn_index == 2
+    assert second.error_id == first.error_id
+    assert second.occurrence_count == 2
+
+    summary = svc.end_session(started.session_id, promote_errors=True)
+    assert summary.errors_extracted == 1
+    assert len(summary.promoted_cards) == 1
+    promoted_card_id = summary.promoted_cards[0].card_id
+
+    with sqlite3.connect(db_path) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM error_logs").fetchone()[0]
+        card_type = conn.execute(
+            "SELECT card_type FROM cards WHERE id = ?",
+            (promoted_card_id,),
+        ).fetchone()[0]
+    assert count == 1
+    assert card_type == "pronunciation"
